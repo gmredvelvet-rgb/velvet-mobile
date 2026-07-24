@@ -158,20 +158,47 @@ export class LicenseUI {
 }
 
 /**
- * Settings-menu entry point. Foundry instantiates and renders this class;
- * we hand straight over to the card instead of drawing a form.
+ * Settings-menu entry point, built on demand rather than at import time.
+ *
+ * Extending `foundry.applications.api.ApplicationV2` at module scope would
+ * evaluate that path while the file loads: if a future release moves or
+ * renames it, the *entire module* would fail to import — a total outage
+ * caused by a settings button. Resolving it inside a function defers the
+ * lookup to `init`, when the API is present, and lets a missing base class
+ * degrade to a shim instead.
+ *
+ * `registerMenu` only ever constructs the class and calls `render()`.
+ * @returns {Function} A class suitable for `game.settings.registerMenu`.
  */
-export class LicenseMenu extends foundry.applications.api.ApplicationV2 {
-  static DEFAULT_OPTIONS = { id: `${MODULE_ID}-license-menu` };
+export function licenseMenuClass() {
+  const Base = foundry.applications?.api?.ApplicationV2;
 
-  /** @override */
-  async render() {
-    LicenseUI.show();
-    return this;
+  if (!Base) {
+    Logger.warn("ApplicationV2 unavailable — using a minimal licence menu shim");
+    return class LicenseMenuShim {
+      async render() {
+        LicenseUI.show();
+        return this;
+      }
+
+      async close() {
+        return this;
+      }
+    };
   }
 
-  /** @override */
-  async close() {
-    return this;
-  }
+  return class LicenseMenu extends Base {
+    static DEFAULT_OPTIONS = { id: `${MODULE_ID}-license-menu` };
+
+    /** @override — hand straight over to the card instead of drawing a form. */
+    async render() {
+      LicenseUI.show();
+      return this;
+    }
+
+    /** @override */
+    async close() {
+      return this;
+    }
+  };
 }

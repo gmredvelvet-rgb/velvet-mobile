@@ -5,7 +5,7 @@
  */
 
 import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES } from "./constants.mjs";
-import { LicenseMenu } from "../license/license-ui.mjs";
+import { licenseMenuClass } from "../license/license-ui.mjs";
 
 export class Settings {
   /**
@@ -33,7 +33,7 @@ export class Settings {
       label: localize("License.Label"),
       hint: localize("License.Hint"),
       icon: "fa-brands fa-patreon",
-      type: LicenseMenu,
+      type: licenseMenuClass(),
       restricted: true
     });
 

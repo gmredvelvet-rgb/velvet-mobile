@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.13.0 — v14 readiness audit (2026-07-24)
+
+Full engineering audit against the released Foundry v14 API documentation.
+No features changed; the module now avoids the internals most likely to move
+between major versions.
+
+### Verified against v14 documentation
+- `ApplicationV1` is **not** removed in v14, so the AppV1 hooks this module
+  registers (`renderActorSheet`, `renderApplication`) still fire. Core's own
+  note confirms `ui.activeWindow`/`_maxZ` survive until V1 retires.
+- `ApplicationV2`, `DocumentSheetV2` and `DialogV2` keep their v13 paths.
+- No manifest schema changes; `compatibility`, `relationships`, `media` and
+  `authors` are unchanged.
+
+### Changed — future compatibility
+- **ChromeHider replaces hardcoded DOM ids.** Hiding Foundry's interface now
+  asks Foundry where it *is*, through the `ui.*` application singletons,
+  instead of naming `#players`, `#ui-left`, `#sidebar`… Those ids are internal
+  markup that already moved once inside v13 — the bug that left the players
+  list floating over the mobile UI. The id rules remain as a harmless
+  fallback. Re-applied after every application render, since core UI
+  re-renders replace their own elements.
+- **No file depends on a Foundry API to be importable.** The licence settings
+  menu extended `foundry.applications.api.ApplicationV2` at module scope: had
+  that path moved, the *entire module* would have failed to load. The class is
+  now built on demand at `init`, with a shim if the base class is absent.
+- **Window sweep prefers AppV2.** `foundry.applications.instances` (with a
+  fallback to `ApplicationV2.instances`) runs first; the legacy `ui.windows`
+  pass is fully optional-chained so its eventual removal is a no-op.
+
+### Compatibility
+- `compatibility.maximum` raised to `14`. `verified` stays at `13`: the code
+  is v14-*ready* by audit, but has not been run on a v14 world.
+
 ## 0.12.2 — Persistent licence card (2026-07-10)
 
 ### Fixed

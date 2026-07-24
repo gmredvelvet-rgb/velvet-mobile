@@ -99,10 +99,18 @@
     display: none !important;
   }
 
-  /* The rule above only reaches DIRECT children of #interface, and v13 nests
-   * much of its chrome one level deeper (or outside it entirely) — that is
-   * why the players list survived and floated over the mobile UI. Hide the
-   * known chrome by id as well, independent of where it sits in the DOM. */
+  /* Applied by ChromeHider, which asks Foundry where its UI actually is via
+   * the ui.* singletons. This is the authoritative rule: it survives markup
+   * changes between versions, unlike the id list below. */
+  html[data-vm-sheet-only] .vm-chrome-hidden {
+    display: none !important;
+  }
+
+  /* Belt and braces. The rule above only reaches DIRECT children of
+   * #interface, and v13 nests much of its chrome one level deeper (or
+   * outside it entirely) — that is why the players list survived and floated
+   * over the mobile UI. Hiding the known ids costs nothing and simply stops
+   * matching if a future version renames them. */
   html[data-vm-sheet-only] #players,
   html[data-vm-sheet-only] #scene-navigation,
   html[data-vm-sheet-only] #navigation,

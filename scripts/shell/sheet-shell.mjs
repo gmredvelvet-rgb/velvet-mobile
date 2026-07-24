@@ -31,6 +31,7 @@ import { Joystick } from "../components/joystick.mjs";
 import { Motion, DURATION } from "../motion/animation-engine.mjs";
 import { modelFor } from "../sheet/adapters.mjs";
 import { MobileSheet } from "../sheet/mobile-sheet.mjs";
+import { ChromeHider } from "./chrome-hider.mjs";
 
 /** Class marking the drawer-presented sheet (CSS contract). */
 const PINNED_CLS = "vm-pinned";
@@ -51,6 +52,9 @@ export class SheetShell {
 
   /** @type {Error|null} Why the last startup attempt failed, for diagnostics. */
   #lastError = null;
+
+  /** @type {ChromeHider} Hides Foundry's UI without depending on its markup. */
+  #chrome = new ChromeHider();
 
   /** @returns {Error|null} */
   get lastError() {
@@ -173,11 +177,13 @@ export class SheetShell {
     this.#buildCarousel();
     this.#buildStack();
 
-    // Our UI exists — now Foundry's can go.
+    // Our UI exists — now Foundry's can go. The attribute drives the CSS
+    // rules; ChromeHider covers whatever the markup moved or renamed.
     const root = document.documentElement;
     root.setAttribute(ROOT_ATTRS.SHEET_ONLY, "");
     if (Settings.map) root.setAttribute(ROOT_ATTRS.MAP, "");
     else this.#freezeCanvas(true);
+    this.#chrome.enable();
     this.#sweepOpenWindows();
     // canvasReady already fired before the shell enabled: claim the token now.
     this.#controlToken();
@@ -264,6 +270,7 @@ export class SheetShell {
     this.#msheet = null;
     this.#undecorate();
 
+    this.#chrome.disable();
     this.#freezeCanvas(false);
     const root = document.documentElement;
     root.removeAttribute(ROOT_ATTRS.SHEET_ONLY);
@@ -1214,18 +1221,29 @@ export class SheetShell {
    * leftover desktop windows have no place in the mobile experience.
    */
   #sweepOpenWindows() {
+    // AppV2 first — the forward-looking path. Only document sheets are
+    // closed; core UI singletons are ApplicationV2 too and must survive.
     try {
-      // AppV1: ui.windows only holds floating windows — safe to clear.
-      for (const app of Object.values(ui.windows ?? {})) app.close?.();
-      // AppV2: only document sheets; core chrome singletons must survive.
-      const DocumentSheetV2 = foundry.applications?.api?.DocumentSheetV2;
-      if (DocumentSheetV2) {
-        for (const app of foundry.applications.instances.values()) {
+      const api = foundry.applications?.api;
+      const DocumentSheetV2 = api?.DocumentSheetV2;
+      const registry = foundry.applications?.instances ?? api?.ApplicationV2?.instances;
+      const open = typeof registry === "function" ? registry() : registry?.values?.();
+      if (DocumentSheetV2 && open) {
+        for (const app of open) {
           if (app instanceof DocumentSheetV2) app.close?.({ animate: false });
         }
       }
     } catch (err) {
-      Logger.debug("Window sweep skipped", err);
+      Logger.debug("AppV2 window sweep skipped", err);
+    }
+
+    // AppV1 legacy path. Still shipped in v14 but slated for removal once
+    // ApplicationV1 is retired; every access is optional so its
+    // disappearance degrades to a no-op instead of throwing.
+    try {
+      for (const app of Object.values(globalThis.ui?.windows ?? {})) app.close?.();
+    } catch (err) {
+      Logger.debug("AppV1 window sweep skipped", err);
     }
   }
 
