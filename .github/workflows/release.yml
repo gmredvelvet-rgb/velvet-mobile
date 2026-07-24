@@ -16,7 +16,7 @@ jobs:
 
       - name: Extract version
         id: ver
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       # The tag is the single source of truth for the version, so a release
       # can never ship a manifest that disagrees with it.
@@ -28,21 +28,50 @@ jobs:
         run: |
           node -e "
             const m = require('./module.json');
-            if (m.version !== '${{ steps.ver.outputs.VERSION }}') throw new Error('version mismatch');
-            for (const f of [...m.esmodules, ...m.styles, ...m.languages.map(l => l.path)]) {
-              if (!require('fs').existsSync(f)) throw new Error('missing file: ' + f);
+            const fs = require('fs');
+            const tag = '${{ steps.ver.outputs.VERSION }}';
+            const fail = (msg) => { throw new Error(msg); };
+
+            if (m.version !== tag) fail('version mismatch: ' + m.version + ' != ' + tag);
+            if (!/^[a-z0-9-]+$/.test(m.id)) fail('id must be lowercase/hyphen: ' + m.id);
+            if (m.id !== 'velvet-mobile') fail('id must equal folder name: ' + m.id);
+            if (!m.compatibility || !m.compatibility.minimum) fail('compatibility.minimum required');
+            for (const k of ['title','description','manifest','download']) {
+              if (!m[k]) fail('missing required field: ' + k);
             }
-            console.log('manifest OK — v' + m.version);
+            for (const url of [m.manifest, m.download]) {
+              if (!/releases\/latest\/download\//.test(url)) fail('manifest/download must use releases/latest/download: ' + url);
+            }
+            const files = [...(m.esmodules||[]), ...(m.scripts||[]), ...(m.styles||[]), ...(m.languages||[]).map(l => l.path)];
+            for (const f of files) {
+              if (!fs.existsSync(f)) fail('missing referenced file: ' + f);
+            }
+            console.log('manifest OK — v' + m.version + ' (' + files.length + ' referenced files present)');
           "
+
+      # Pull just this version's section out of the changelog so the GitHub
+      # Release body is the notes for THIS release, not the entire history.
+      - name: Extract release notes
+        run: |
+          awk -v ver="${{ steps.ver.outputs.VERSION }}" '
+            $0 ~ "^## " ver { grab=1; print; next }
+            grab && /^## [0-9]/ { exit }
+            grab { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Velvet Mobile v${{ steps.ver.outputs.VERSION }}" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)." >> RELEASE_NOTES.md
+          fi
 
       - name: Build module.zip
         run: |
           zip -r module.zip . \
             --exclude "*.git*" \
             --exclude ".github/*" \
-            --exclude ".gitignore" \
             --exclude "docs/*" \
             --exclude "*.code-workspace" \
+            --exclude "RELEASE_NOTES.md" \
             --exclude "module.zip"
 
       - name: Create release
@@ -50,7 +79,7 @@ jobs:
         with:
           name: "Velvet Mobile v${{ steps.ver.outputs.VERSION }}"
           tag_name: ${{ github.ref_name }}
-          body_path: CHANGELOG.md
+          body_path: RELEASE_NOTES.md
           files: |
             module.zip
             module.json

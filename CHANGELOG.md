@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.13.1 — packaging & documentation polish (2026-07-24)
+
+No functional changes to the module. Distribution stays **by manifest URL**
+(Patreon-gated subscription model); this release tidies the repository and
+release pipeline.
+
+### Documentation
+- **README rewritten.** Fixed the stale `License: TBD` line that contradicted
+  the proprietary LICENSE, and the "v13-only" wording (the module is v13
+  verified and v14-ready by audit). Added Installation (manifest URL),
+  Requirements, Compatibility, FAQ, Troubleshooting, Support and developer/
+  release sections.
+- Added `CONTRIBUTING.md` and `SECURITY.md` (private vulnerability reporting).
+
+### Release pipeline
+- Release notes now contain **only the tagged version's** changelog section
+  instead of the entire history.
+- Manifest validation hardened in CI: checks the id is lowercase/hyphen and
+  matches the folder, required fields are present, and the manifest/download
+  URLs use `releases/latest/download`.
+
+### Tooling
+- Added GitHub issue templates (bug/feature), a pull-request template,
+  `FUNDING.yml` (Patreon) and `.editorconfig` (LF/UTF-8, matching
+  `.gitattributes`).
+
 ## 0.13.0 — v14 readiness audit (2026-07-24)
 
 Full engineering audit against the released Foundry v14 API documentation.

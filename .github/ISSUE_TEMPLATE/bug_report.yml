@@ -1,0 +1,68 @@
+name: 🐛 Bug report
+description: Something in Velvet Mobile isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill in as much as you can — it makes fixes far faster.
+  - type: input
+    id: foundry-version
+    attributes:
+      label: Foundry VTT version
+      placeholder: "e.g. 13.346"
+    validations:
+      required: true
+  - type: input
+    id: module-version
+    attributes:
+      label: Velvet Mobile version
+      placeholder: "e.g. 0.13.0"
+    validations:
+      required: true
+  - type: input
+    id: game-system
+    attributes:
+      label: Game system + version
+      placeholder: "e.g. pf2e 6.x"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device / browser
+      placeholder: "e.g. iPhone 14, Safari 17 / Pixel 7, Chrome"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Open the developer console (F12) and paste any red errors. Enable the Debug setting for more detail.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I confirmed the GM has an active Patreon subscription and has authorised the licence.
+          required: true
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
