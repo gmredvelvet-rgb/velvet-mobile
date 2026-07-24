@@ -1,0 +1,508 @@
+/**
+ * Velvet Mobile — native mobile sheet styles.
+ * The fullscreen drawer the MobileSheet component renders: header with
+ * portrait/HP/AC, scrolling tab content, bottom tab bar. Phone-first,
+ * safe-area aware, dark chrome with the velvet accent.
+ */
+
+@layer velvet-mobile.sheet {
+  .vm-msheet {
+    position: fixed;
+    inset: 0;
+    z-index: 20; /* above the home screen; stack, chat and Foundry windows sit above */
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgb(28 26 34) 0%, rgb(18 17 22) 30%);
+    color: var(--vm-text);
+    padding-top: var(--vm-safe-top);
+    will-change: transform;
+    overscroll-behavior: contain;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Handle
+   * ------------------------------------------------------------------ */
+
+  .vm-ms-handle {
+    flex: 0 0 auto;
+    position: relative;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .vm-ms-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 0.35);
+  }
+
+  .vm-ms-close {
+    position: absolute;
+    top: 0;
+    right: var(--vm-space-2);
+    width: 40px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
+    border-radius: var(--vm-radius-md);
+    background: transparent;
+    color: rgb(255 255 255 / 0.6);
+    font-size: 0.9rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Header
+   * ------------------------------------------------------------------ */
+
+  .vm-ms-header {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "portrait title"
+      "portrait stats"
+      "hp hp";
+    gap: var(--vm-space-1) var(--vm-space-3);
+    padding: var(--vm-space-1) var(--vm-space-4) var(--vm-space-2);
+    border-bottom: 1px solid var(--vm-surface-border);
+  }
+
+  .vm-ms-portrait {
+    grid-area: portrait;
+    width: calc(64px * var(--vm-scale));
+    height: calc(64px * var(--vm-scale));
+    object-fit: cover;
+    object-position: top;
+    border: 2px solid var(--vm-accent);
+    border-radius: var(--vm-radius-md);
+    box-shadow: 0 4px 10px rgb(0 0 0 / 0.5);
+  }
+
+  .vm-ms-title {
+    grid-area: title;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .vm-ms-title h1 {
+    margin: 0;
+    border: none;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-ms-subtitle {
+    color: var(--vm-text-dim);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-ms-stats {
+    grid-area: stats;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .vm-ms-stat {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 44px;
+    padding: 2px 8px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--vm-text);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-stat.vm-tappable:active {
+    border-color: var(--vm-accent);
+    color: var(--vm-accent);
+  }
+
+  .vm-ms-ac {
+    border-color: var(--vm-accent);
+  }
+
+  .vm-ms-stat-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .vm-ms-stat-label {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-ms-hp {
+    grid-area: hp;
+    position: relative;
+    height: 26px;
+    margin-top: var(--vm-space-1);
+    padding: 0;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: rgb(0 0 0 / 0.5);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Systems without a hit-point track get no empty bar. */
+  .vm-ms-hp-none {
+    display: none;
+  }
+
+  .vm-ms-hp-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: rgb(90 170 80);
+    transition: width var(--vm-anim-normal) var(--vm-ease), background var(--vm-anim-normal) var(--vm-ease);
+  }
+
+  .vm-ms-hp-fill.vm-low {
+    background: rgb(200 150 55);
+  }
+
+  .vm-ms-hp-fill.vm-critical {
+    background: rgb(190 60 55);
+  }
+
+  .vm-ms-hp-text {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 100%;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Body + sections
+   * ------------------------------------------------------------------ */
+
+  .vm-ms-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    /* Centered reading column on tablets; edge-to-edge on phones. */
+    padding: var(--vm-space-2) max(var(--vm-space-3), calc((100vw - 760px) / 2)) var(--vm-space-6);
+  }
+
+  .vm-ms-section {
+    margin-bottom: var(--vm-space-4);
+  }
+
+  .vm-ms-section-head {
+    position: sticky;
+    top: calc(-1 * var(--vm-space-2));
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    margin: var(--vm-space-3) 0 var(--vm-space-2);
+    padding: var(--vm-space-1) 0;
+    background: rgb(19 18 23 / 0.95);
+  }
+
+  .vm-ms-section-head h2 {
+    margin: 0;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-ms-section-badge {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--vm-surface-raised);
+    border: 1px solid var(--vm-surface-border);
+    font-size: 0.72rem;
+    color: var(--vm-text);
+  }
+
+  .vm-ms-empty {
+    margin: var(--vm-space-2) 0;
+    color: var(--vm-text-dim);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  /* Abilities grid */
+  .vm-ms-abilities {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--vm-space-1);
+    margin-bottom: var(--vm-space-2);
+  }
+
+  .vm-ms-ability {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: var(--vm-space-2) 0;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--vm-text);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-ability.vm-tappable:active {
+    border-color: var(--vm-accent);
+  }
+
+  .vm-ms-ability-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-ms-ability-mod {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  /* Rows */
+  .vm-ms-row {
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .vm-ms-row-line {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .vm-ms-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    min-height: var(--vm-touch-target);
+    padding: var(--vm-space-1) 0;
+    border: none;
+    background: transparent;
+    color: var(--vm-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-row-main:active {
+    background: rgb(255 255 255 / 0.05);
+  }
+
+  .vm-ms-row-img {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+  }
+
+  .vm-ms-row-dot {
+    flex: 0 0 auto;
+    width: 18px;
+    display: grid;
+    place-items: center;
+  }
+
+  .vm-ms-prof {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1px solid var(--vm-text-dim);
+  }
+
+  .vm-ms-prof.vm-on {
+    background: var(--vm-accent);
+    border-color: var(--vm-accent);
+  }
+
+  .vm-ms-row-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vm-ms-row-label {
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-ms-row-sub {
+    font-size: 0.72rem;
+    color: var(--vm-text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-ms-row-badge {
+    flex: 0 0 auto;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--vm-surface-raised);
+    border: 1px solid var(--vm-surface-border);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .vm-ms-row-action {
+    flex: 0 0 auto;
+    width: var(--vm-touch-target);
+    display: grid;
+    place-items: center;
+    border: none;
+    background: transparent;
+    color: var(--vm-text-dim);
+    font-size: 0.95rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-row-action:active {
+    color: var(--vm-accent);
+  }
+
+  .vm-ms-row-detail {
+    padding: 0 var(--vm-space-2) var(--vm-space-2) calc(34px + var(--vm-space-3));
+    font-size: 0.82rem;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-ms-row-detail img {
+    max-width: 100%;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Tab bar
+   * ------------------------------------------------------------------ */
+
+  .vm-ms-tabs {
+    flex: 0 0 auto;
+    display: flex;
+    padding-bottom: var(--vm-safe-bottom);
+    background: rgb(0 0 0 / 0.35);
+    border-top: 1px solid var(--vm-surface-border);
+  }
+
+  .vm-ms-tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: calc(52px * var(--vm-scale));
+    padding: var(--vm-space-1) 0;
+    border: none;
+    background: transparent;
+    color: var(--vm-text-dim);
+    font-size: 1rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-tab span {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .vm-ms-tab.vm-active {
+    color: var(--vm-accent);
+  }
+
+  /* Keyboard: give the content the room. */
+  html[data-vm-keyboard="open"] .vm-ms-tabs {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Adaptability
+   * ------------------------------------------------------------------ */
+
+  /* Wide screens: two reading columns per section. */
+  @media (min-width: 640px) {
+    .vm-ms-section {
+      columns: 2;
+      column-gap: var(--vm-space-6);
+    }
+
+    .vm-ms-section-head {
+      column-span: all;
+      position: static; /* sticky and columns don't mix */
+    }
+
+    .vm-ms-row {
+      break-inside: avoid;
+    }
+  }
+
+  /* Landscape phones: compress the header so content keeps the height. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .vm-ms-header {
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas:
+        "portrait title stats"
+        "portrait hp hp";
+      align-items: center;
+      padding-block: 2px var(--vm-space-1);
+    }
+
+    .vm-ms-portrait {
+      width: 46px;
+      height: 46px;
+    }
+
+    .vm-ms-title h1 {
+      font-size: 1rem;
+    }
+
+    .vm-ms-hp {
+      height: 20px;
+      margin-top: 2px;
+    }
+
+    .vm-ms-hp-text {
+      font-size: 0.75rem;
+    }
+
+    .vm-ms-tab {
+      min-height: 40px;
+      flex-direction: row;
+      gap: var(--vm-space-1);
+    }
+  }
+}

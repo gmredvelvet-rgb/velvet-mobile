@@ -1,0 +1,12 @@
+# Release artefact — built by CI, never committed
+module.zip
+
+# Editor / OS
+*.code-workspace
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local scratch
+.claude/

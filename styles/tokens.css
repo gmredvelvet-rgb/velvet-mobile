@@ -1,0 +1,75 @@
+/**
+ * Velvet Mobile — design tokens.
+ *
+ * Single source of visual truth. Every stylesheet consumes these custom
+ * properties; none may declare its own magic numbers. JS overrides
+ * --vm-vvh / --vm-kb / --vm-scale inline on <html> at runtime.
+ *
+ * The whole module lives in the `velvet-mobile` layer: it wins over Foundry
+ * core (layered) styles while deliberately losing to other modules'
+ * unlayered CSS — good-citizen override behavior.
+ */
+
+@layer velvet-mobile.tokens {
+  :root {
+    /* Viewport ------------------------------------------------------- */
+    /* Keyboard-aware viewport height. Fallback for first paint; the     */
+    /* DeviceProfiler keeps it in px sync with window.visualViewport.    */
+    --vm-vvh: 100dvh;
+    /* Height currently covered by the on-screen keyboard.               */
+    --vm-kb: 0px;
+    /* Safe areas (notch, Dynamic Island, rounded corners, hinge).       */
+    --vm-safe-top: env(safe-area-inset-top, 0px);
+    --vm-safe-right: env(safe-area-inset-right, 0px);
+    --vm-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --vm-safe-left: env(safe-area-inset-left, 0px);
+
+    /* Touch ---------------------------------------------------------- */
+    --vm-scale: 1;
+    --vm-touch-target: calc(44px * var(--vm-scale));
+    /* Minimum font size on inputs that prevents iOS focus auto-zoom.    */
+    --vm-font-min: 16px;
+
+    /* Spacing (4px grid) --------------------------------------------- */
+    --vm-space-1: 4px;
+    --vm-space-2: 8px;
+    --vm-space-3: 12px;
+    --vm-space-4: 16px;
+    --vm-space-6: 24px;
+
+    /* Shape ----------------------------------------------------------- */
+    --vm-radius-sm: 6px;
+    --vm-radius-md: 10px;
+    --vm-radius-lg: 16px;
+
+    /* Surfaces (dark chrome, matching Foundry's UI language) ---------- */
+    --vm-surface: rgb(24 24 28 / 0.96);
+    --vm-surface-raised: rgb(38 38 44 / 0.98);
+    --vm-surface-border: rgb(255 255 255 / 0.12);
+    --vm-text: rgb(235 235 240);
+    --vm-text-dim: rgb(255 255 255 / 0.6);
+    --vm-accent: rgb(176 106 179);
+    --vm-backdrop: rgb(0 0 0 / 0.45);
+    --vm-shadow: 0 -8px 32px rgb(0 0 0 / 0.5);
+
+    /* Stacking ------------------------------------------------------- *
+     * Every Velvet surface lives BELOW 100, where Foundry starts its own
+     * window band and manages relative order itself (bringToFront). Forcing
+     * our surfaces above it would flatten that ordering and make windows
+     * impossible to bring forward — so we stay underneath instead.        */
+    --vm-z-shell: 30;
+    --vm-z-sheet: 50;
+
+    /* Motion (mirrors motion/animation-engine.mjs) --------------------- */
+    --vm-anim-fast: 150ms;
+    --vm-anim-normal: 250ms;
+    --vm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --vm-anim-fast: 0ms;
+      --vm-anim-normal: 0ms;
+    }
+  }
+}

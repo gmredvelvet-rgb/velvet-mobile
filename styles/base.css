@@ -1,0 +1,69 @@
+/**
+ * Velvet Mobile — global behavioral fixes.
+ *
+ * Phase 1 deliberately contains NO visual redesign: only invisible fixes
+ * that remove platform friction (accidental zoom, pull-to-refresh, iOS
+ * input auto-zoom). Every rule is gated by the data-vm-* attributes that
+ * UIState writes, so with the module off — or on desktop — this file is
+ * completely inert.
+ */
+
+@layer velvet-mobile.base {
+  /* ------------------------------------------------------------------ *
+   * Document-level touch behavior (phone + tablet)
+   * ------------------------------------------------------------------ */
+
+  html[data-vm-active] {
+    /* Prevent mobile browsers from inflating text on their own. */
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+
+  html[data-vm-active] body {
+    /* Kill pull-to-refresh and rubber-band scrolling of the page itself. */
+    overscroll-behavior: none;
+    /* Remove the grey/blue flash on tap. Focus styles remain untouched. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Disable double-tap-to-zoom (and its 300ms click delay) on the whole
+   * UI while keeping scroll and pinch available. touch-action does not
+   * inherit, hence the subtree selector. The PIXI canvas (#board) is
+   * intentionally excluded: Foundry core owns its gesture handling. */
+  html[data-vm-active] #interface,
+  html[data-vm-active] #interface *,
+  html[data-vm-active] #ui-middle,
+  html[data-vm-active] .application,
+  html[data-vm-active] .application *,
+  html[data-vm-active] .app.window-app,
+  html[data-vm-active] .app.window-app *,
+  html[data-vm-active] #tooltip,
+  html[data-vm-active] #notifications {
+    touch-action: manipulation;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Phone-specific fixes
+   * ------------------------------------------------------------------ */
+
+  /* iOS Safari zooms the page when focusing any input rendered below
+   * 16px. Clamping instead of hardcoding preserves larger system fonts. */
+  html[data-vm-device="phone"] input:not([type="checkbox"]):not([type="radio"]),
+  html[data-vm-device="phone"] select,
+  html[data-vm-device="phone"] textarea {
+    font-size: max(var(--vm-font-min), 1em);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Touch-input ergonomics (any device with a coarse primary pointer)
+   * ------------------------------------------------------------------ */
+
+  /* Desktop scrollbars are ~6px in Foundry — nearly impossible to grab
+   * with a finger. Content itself scrolls by touch, so this only aids
+   * orientation and precision drags. */
+  html[data-vm-input="touch"] ::-webkit-scrollbar,
+  html[data-vm-input="hybrid"] ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+}

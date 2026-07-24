@@ -1,0 +1,104 @@
+{
+  "VELVETMOBILE": {
+    "Settings": {
+      "Mode": {
+        "Name": "Modo móvil",
+        "Hint": "Cómo decide Velvet Mobile si activarse en este dispositivo. Auto detecta teléfonos y tablets; Teléfono/Tablet lo fuerzan (útil para probar en escritorio); Apagado desactiva el módulo por completo en este cliente.",
+        "Auto": "Detección automática",
+        "Phone": "Forzar teléfono",
+        "Tablet": "Forzar tablet",
+        "Off": "Apagado (experiencia de escritorio)"
+      },
+      "Map": {
+        "Name": "Mostrar mapa",
+        "Hint": "Mantiene el mapa de juego visible detrás de la interfaz móvil, con navegación táctil (arrastra para moverte, pellizca para acercar). Desactívalo para liberar memoria y batería en teléfonos: el mapa no se cargará en absoluto. Cambiarlo requiere recargar."
+      },
+      "UiScale": {
+        "Name": "Escala de interfaz",
+        "Hint": "Factor de escala global para los elementos de Velvet Mobile. Auméntalo para leer mejor y tener botones más grandes."
+      },
+      "ChatOnMessage": {
+        "Name": "Abrir chat al recibir mensajes",
+        "Hint": "Qué mensajes abren el panel de chat automáticamente. El resto solo enciende el indicador del botón de chat.",
+        "Rolls": "Solo tiradas",
+        "All": "Todos los mensajes",
+        "None": "Nunca"
+      },
+      "ChatAutoHide": {
+        "Name": "Ocultar chat automáticamente (segundos)",
+        "Hint": "Segundos hasta que un panel de chat abierto automáticamente se oculta solo. 0 lo deja abierto. Tocar el panel cancela el temporizador."
+      },
+      "Debug": {
+        "Name": "Modo depuración",
+        "Hint": "Activa el registro detallado en consola para diagnóstico."
+      },
+      "License": {
+        "Name": "Licencia de Patreon",
+        "Label": "Gestionar licencia",
+        "Hint": "Conecta tu cuenta de Patreon para activar Velvet Mobile en este mundo, o libera la ranura de instalación para usarla en otro sitio. Solo el GM."
+      }
+    },
+    "License": {
+      "Title": "Activación",
+      "Intro": "Conecta tu cuenta de Patreon para activar Velvet Mobile en este mundo.",
+      "GmOnly": "Solo el GM autoriza. Una vez activado, todos los jugadores tendrán la interfaz móvil sin hacer nada.",
+      "Connect": "Conectar con Patreon",
+      "Opening": "Abriendo Patreon…",
+      "HaveCode": "Tengo un código",
+      "Later": "Más tarde",
+      "Close": "Cerrar",
+      "Cancelled": "Autorización cancelada. Si la ventana emergente no se abrió, usa la opción «Tengo un código».",
+      "Connected": "Conectado como suscriptor {tier}. ¡Bienvenido!",
+      "Locked": "No se puede contactar con el servidor de licencias. El módulo queda bloqueado hasta reconectar.",
+      "CodeTitle": "Introducir código",
+      "CodeHint": "Pega el código que aparece tras conectar tu cuenta de Patreon.",
+      "Activate": "Activar",
+      "StatusActive": "Licencia activa — suscriptor {tier}.",
+      "StatusInactive": "Sin licencia activa en este mundo.",
+      "Released": "Ranura de instalación liberada.",
+      "Release": "Liberar instalación",
+      "ReleaseHint": "Libera la ranura si vas a usar tu suscripción en otro servidor o navegador.",
+      "ReleaseConfirm": "¿Liberar esta instalación? Velvet Mobile se desactivará para todos los jugadores hasta que vuelvas a conectar."
+    },
+    "Shell": {
+      "Chat": "Chat",
+      "Menu": "Acciones rápidas",
+      "Dice": "Tirar dados",
+      "Move": "Mover ficha",
+      "NoToken": "No tienes una ficha en la escena activa para mover.",
+      "Target": "Objetivo",
+      "TargetClear": "Quitar objetivo",
+      "NoTargets": "No hay fichas a las que apuntar en esta escena.",
+      "ZoomIn": "Acercar",
+      "ZoomOut": "Alejar",
+      "Roll": "Tirar",
+      "Settings": "Ajustes",
+      "SwipeHint": "Desliza hacia arriba o toca tu retrato",
+      "NoActorTitle": "Sin personaje disponible",
+      "NoActorHint": "Pide a tu GM que asigne un personaje a tu usuario, o que te dé propiedad de uno con ficha en la escena.",
+      "NoActorGMHint": "Asígnate un personaje en la configuración de usuario, o activa una escena con fichas. Para salir del modo móvil: botón de ajustes → Modo móvil → Apagado."
+    },
+    "Sheet": {
+      "TabStats": "Atributos",
+      "TabCombat": "Combate",
+      "TabInventory": "Inventario",
+      "TabSpells": "Conjuros",
+      "TabFeatures": "Rasgos",
+      "Skills": "Habilidades",
+      "Saves": "Salvaciones",
+      "Attacks": "Ataques",
+      "HP": "Puntos de golpe",
+      "AC": "CA",
+      "Damage": "Daño",
+      "Heal": "Curar",
+      "Initiative": "Iniciativa",
+      "Speed": "Velocidad",
+      "Proficiency": "Competencia",
+      "Perception": "Percepción",
+      "Equip": "Equipar / desequipar",
+      "Level": "Nivel",
+      "Cantrips": "Trucos",
+      "Empty": "Nada que mostrar"
+    }
+  }
+}

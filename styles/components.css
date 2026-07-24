@@ -1,0 +1,104 @@
+/**
+ * Velvet Mobile — component library styles.
+ * BottomSheet (the only component the sheet-only shell needs).
+ * Transform/opacity animations only; geometry from tokens.css.
+ */
+
+@layer velvet-mobile.components {
+  /* ------------------------------------------------------------------ *
+   * BottomSheet
+   * ------------------------------------------------------------------ */
+
+  .vm-sheet-root {
+    position: fixed;
+    inset: 0;
+    z-index: var(--vm-z-sheet);
+    pointer-events: none;
+  }
+
+  .vm-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--vm-backdrop);
+    pointer-events: auto;
+  }
+
+  .vm-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    background: var(--vm-surface);
+    color: var(--vm-text);
+    border: 1px solid var(--vm-surface-border);
+    border-bottom: none;
+    border-radius: var(--vm-radius-lg) var(--vm-radius-lg) 0 0;
+    box-shadow: var(--vm-shadow);
+    padding-bottom: var(--vm-safe-bottom);
+    will-change: transform;
+  }
+
+  .vm-sheet.vm-fullscreen {
+    border-radius: 0;
+    border: none;
+    padding-top: var(--vm-safe-top);
+  }
+
+  .vm-sheet-handle {
+    display: grid;
+    place-items: center;
+    min-height: 20px;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .vm-sheet-grip {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--vm-text-dim);
+  }
+
+  .vm-sheet-header {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    padding: 0 var(--vm-space-2) var(--vm-space-1) var(--vm-space-4);
+    touch-action: none;
+    border-bottom: 1px solid var(--vm-surface-border);
+  }
+
+  .vm-sheet-title {
+    flex: 1;
+    margin: 0;
+    border: none;
+    font-size: 1.05rem;
+    line-height: var(--vm-touch-target);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-sheet-close {
+    flex: 0 0 auto;
+    width: var(--vm-touch-target);
+    height: var(--vm-touch-target);
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: var(--vm-text);
+    font-size: 1.2rem;
+  }
+
+  .vm-sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}

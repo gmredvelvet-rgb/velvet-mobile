@@ -1,0 +1,104 @@
+{
+  "VELVETMOBILE": {
+    "Settings": {
+      "Mode": {
+        "Name": "Mobile Mode",
+        "Hint": "How Velvet Mobile decides whether to activate on this device. Auto detects phones and tablets; Phone/Tablet force it on (useful for testing on desktop); Off disables the module entirely on this client.",
+        "Auto": "Auto-detect",
+        "Phone": "Force Phone",
+        "Tablet": "Force Tablet",
+        "Off": "Off (desktop experience)"
+      },
+      "Map": {
+        "Name": "Show map",
+        "Hint": "Keeps the game canvas visible behind the mobile interface, with touch navigation (drag to pan, pinch to zoom). Turn it off to free memory and battery on phones: the map is then never loaded at all. Changing this requires a reload."
+      },
+      "UiScale": {
+        "Name": "UI Scale",
+        "Hint": "Global scale factor for Velvet Mobile interface elements. Increase for easier reading and larger touch targets."
+      },
+      "ChatOnMessage": {
+        "Name": "Open chat on new messages",
+        "Hint": "Which incoming messages open the chat panel automatically. Everything else just lights the chat button indicator.",
+        "Rolls": "Rolls only",
+        "All": "All messages",
+        "None": "Never"
+      },
+      "ChatAutoHide": {
+        "Name": "Auto-hide chat (seconds)",
+        "Hint": "Seconds until an auto-opened chat panel hides itself. 0 keeps it open. Touching the panel cancels the timer."
+      },
+      "Debug": {
+        "Name": "Debug Mode",
+        "Hint": "Enable verbose console logging for troubleshooting."
+      },
+      "License": {
+        "Name": "Patreon licence",
+        "Label": "Manage licence",
+        "Hint": "Connect your Patreon account to activate Velvet Mobile in this world, or release the installation slot to use it elsewhere. GM only."
+      }
+    },
+    "License": {
+      "Title": "Activation",
+      "Intro": "Connect your Patreon account to activate Velvet Mobile in this world.",
+      "GmOnly": "Only the GM authorises. Once activated, every player gets the mobile interface automatically.",
+      "Connect": "Connect Patreon",
+      "Opening": "Opening Patreon…",
+      "HaveCode": "I have a code",
+      "Later": "Later",
+      "Close": "Close",
+      "Cancelled": "Authorisation cancelled. If the popup never opened, use \"I have a code\".",
+      "Connected": "Connected as {tier} subscriber. Welcome!",
+      "Locked": "Licence server unreachable. The module is locked until it reconnects.",
+      "CodeTitle": "Enter auth code",
+      "CodeHint": "Paste the code shown after connecting your Patreon account.",
+      "Activate": "Activate",
+      "StatusActive": "Licence active — {tier} subscriber.",
+      "StatusInactive": "No active licence in this world.",
+      "Released": "Installation slot released.",
+      "Release": "Release installation",
+      "ReleaseHint": "Release the slot if you are moving your subscription to another server or browser.",
+      "ReleaseConfirm": "Release this installation? Velvet Mobile will switch off for every player until you connect again."
+    },
+    "Shell": {
+      "Chat": "Chat",
+      "Menu": "Quick actions",
+      "Dice": "Roll dice",
+      "Move": "Move token",
+      "NoToken": "You have no token on the active scene to move.",
+      "Target": "Target",
+      "TargetClear": "Clear target",
+      "NoTargets": "No tokens to target on this scene.",
+      "ZoomIn": "Zoom in",
+      "ZoomOut": "Zoom out",
+      "Roll": "Roll",
+      "Settings": "Settings",
+      "SwipeHint": "Swipe up or tap your portrait",
+      "NoActorTitle": "No character available",
+      "NoActorHint": "Ask your GM to assign a character to your user, or grant you ownership of one with a token in the scene.",
+      "NoActorGMHint": "Assign yourself a character in the user configuration, or activate a scene with tokens. To leave mobile mode: settings button → Mobile Mode → Off."
+    },
+    "Sheet": {
+      "TabStats": "Stats",
+      "TabCombat": "Combat",
+      "TabInventory": "Inventory",
+      "TabSpells": "Spells",
+      "TabFeatures": "Features",
+      "Skills": "Skills",
+      "Saves": "Saving Throws",
+      "Attacks": "Attacks",
+      "HP": "Hit Points",
+      "AC": "AC",
+      "Damage": "Damage",
+      "Heal": "Heal",
+      "Initiative": "Initiative",
+      "Speed": "Speed",
+      "Proficiency": "Proficiency",
+      "Perception": "Perception",
+      "Equip": "Equip / unequip",
+      "Level": "Level",
+      "Cantrips": "Cantrips",
+      "Empty": "Nothing to show"
+    }
+  }
+}

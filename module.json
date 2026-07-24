@@ -1,0 +1,49 @@
+{
+  "id": "velvet-mobile",
+  "title": "Velvet Mobile",
+  "description": "Swipe-style sheet-only mobile experience for Foundry VTT: on phones and tablets the client becomes a mobile app around your character sheet — avatar carousel, fullscreen sheet drawer, movement joystick, floating dice and chat — with Foundry's interface out of the way, and zero impact on desktop.",
+  "version": "0.12.2",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "GM RedVelvet",
+      "email": "gmredvelvet@gmail.com",
+      "url": "https://github.com/gmredvelvet-rgb",
+      "discord": "gmredvelvet"
+    }
+  ],
+  "url": "https://github.com/gmredvelvet-rgb/velvet-mobile",
+  "manifest": "https://github.com/gmredvelvet-rgb/velvet-mobile/releases/latest/download/module.json",
+  "download": "https://github.com/gmredvelvet-rgb/velvet-mobile/releases/latest/download/module.zip",
+  "readme": "https://github.com/gmredvelvet-rgb/velvet-mobile#readme",
+  "bugs": "https://github.com/gmredvelvet-rgb/velvet-mobile/issues",
+  "changelog": "https://github.com/gmredvelvet-rgb/velvet-mobile/blob/main/CHANGELOG.md",
+  "license": "SEE LICENSE IN LICENSE",
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "styles": [
+    "styles/tokens.css",
+    "styles/base.css",
+    "styles/components.css",
+    "styles/shell.css",
+    "styles/sheet.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    },
+    {
+      "lang": "es",
+      "name": "Español",
+      "path": "lang/es.json"
+    }
+  ],
+  "flags": {}
+}

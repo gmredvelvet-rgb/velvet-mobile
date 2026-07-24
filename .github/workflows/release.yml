@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      # The tag is the single source of truth for the version, so a release
+      # can never ship a manifest that disagrees with it.
+      - name: Update module.json version
+        run: |
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{ steps.ver.outputs.VERSION }}\"/" module.json
+
+      - name: Verify manifest
+        run: |
+          node -e "
+            const m = require('./module.json');
+            if (m.version !== '${{ steps.ver.outputs.VERSION }}') throw new Error('version mismatch');
+            for (const f of [...m.esmodules, ...m.styles, ...m.languages.map(l => l.path)]) {
+              if (!require('fs').existsSync(f)) throw new Error('missing file: ' + f);
+            }
+            console.log('manifest OK — v' + m.version);
+          "
+
+      - name: Build module.zip
+        run: |
+          zip -r module.zip . \
+            --exclude "*.git*" \
+            --exclude ".github/*" \
+            --exclude ".gitignore" \
+            --exclude "docs/*" \
+            --exclude "*.code-workspace" \
+            --exclude "module.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Velvet Mobile v${{ steps.ver.outputs.VERSION }}"
+          tag_name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: |
+            module.zip
+            module.json
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,114 @@
+/**
+ * Velvet Mobile — central constants.
+ * Every setting key, hook name, attribute and magic value lives here.
+ * No other file may declare a string identifier of its own.
+ * @module core/constants
+ */
+
+/** Module identifier. Must match the module folder name and module.json id. */
+export const MODULE_ID = "velvet-mobile";
+
+/** Human-readable title used in log prefixes. */
+export const MODULE_TITLE = "Velvet Mobile";
+
+/** Localization key prefix. */
+export const L10N = "VELVETMOBILE";
+
+/** Setting keys (registered under MODULE_ID). */
+export const SETTINGS = Object.freeze({
+  MODE: "mode",
+  MAP: "map",
+  WORLD_LICENSED: "worldLicensed",
+  LICENSE_MENU: "licenseMenu",
+  UI_SCALE: "uiScale",
+  CHAT_ON_MESSAGE: "chatOnMessage",
+  CHAT_AUTO_HIDE: "chatAutoHide",
+  MANAGED_NOCANVAS: "managedNoCanvas",
+  DEBUG: "debug"
+});
+
+/** Values for the `chatOnMessage` setting. */
+export const CHAT_MODES = Object.freeze({
+  NONE: "none",
+  ROLLS: "rolls",
+  ALL: "all"
+});
+
+/** Values for the `mode` setting. */
+export const MODES = Object.freeze({
+  AUTO: "auto",
+  PHONE: "phone",
+  TABLET: "tablet",
+  OFF: "off"
+});
+
+/** Device classifications produced by the DeviceProfiler. */
+export const DEVICES = Object.freeze({
+  PHONE: "phone",
+  TABLET: "tablet",
+  DESKTOP: "desktop"
+});
+
+/** Input classifications produced by the DeviceProfiler. */
+export const INPUTS = Object.freeze({
+  TOUCH: "touch",
+  MOUSE: "mouse",
+  HYBRID: "hybrid"
+});
+
+/** Orientation values. */
+export const ORIENTATIONS = Object.freeze({
+  PORTRAIT: "portrait",
+  LANDSCAPE: "landscape"
+});
+
+/**
+ * Width breakpoints (content-based, not device-based).
+ * A viewport belongs to the first bucket whose `max` exceeds its width.
+ */
+export const SIZE_BUCKETS = Object.freeze([
+  Object.freeze({ id: "xs", max: 380 }),
+  Object.freeze({ id: "sm", max: 600 }),
+  Object.freeze({ id: "md", max: 900 }),
+  Object.freeze({ id: "lg", max: 1200 }),
+  Object.freeze({ id: "xl", max: Infinity })
+]);
+
+/** Minimum viewport dimension below which a touch device is a phone, not a tablet. */
+export const PHONE_MAX_MIN_DIMENSION = 600;
+
+/** Public hooks fired by this module. */
+export const HOOKS = Object.freeze({
+  READY: "velvetMobile.ready",
+  DEVICE_CHANGED: "velvetMobile.deviceChanged",
+  ACTOR_CHANGED: "velvetMobile.actorChanged"
+});
+
+/** Attributes applied to <html> — the single JS→CSS contract. */
+export const ROOT_ATTRS = Object.freeze({
+  ACTIVE: "data-vm-active",
+  DEVICE: "data-vm-device",
+  INPUT: "data-vm-input",
+  ORIENTATION: "data-vm-orientation",
+  SIZE: "data-vm-size",
+  KEYBOARD: "data-vm-keyboard",
+  SHEET_ONLY: "data-vm-sheet-only",
+  DRAWER: "data-vm-drawer",
+  MAP: "data-vm-map"
+});
+
+/** CSS custom properties written by JS onto <html> (inline, so they win over tokens.css defaults). */
+export const CSS_VARS = Object.freeze({
+  VISUAL_HEIGHT: "--vm-vvh",
+  KEYBOARD_INSET: "--vm-kb",
+  SCALE: "--vm-scale"
+});
+
+/** Class name prefix for every DOM element the component library creates. */
+export const CLS = "vm";
+
+/** Debounce applied to viewport/media re-evaluation, in milliseconds. */
+export const REFRESH_DEBOUNCE_MS = 100;
+
+/** Keyboard is considered open when the visual viewport shrinks more than this (px). */
+export const KEYBOARD_MIN_INSET = 80;

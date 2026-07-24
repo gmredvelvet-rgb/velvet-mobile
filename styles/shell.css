@@ -1,0 +1,973 @@
+/**
+ * Velvet Mobile — Swipe-style sheet-only shell.
+ *
+ * When active (html[data-vm-sheet-only]) Foundry disappears: interface
+ * chrome and canvas hide (notifications stay) and the client becomes a
+ * phone app — home screen with scene artwork and avatar carousel, the
+ * actor sheet as a fullscreen drawer, a floating button stack and the
+ * chat as a bottom sheet. Attribute-gated: inert when the shell is off.
+ */
+
+@layer velvet-mobile.shell {
+  /* ------------------------------------------------------------------ *
+   * Licence card
+   *
+   * Shown while the module is NOT licensed, so it must not depend on any
+   * data-vm-* attribute (those only exist once the shell takes over). Sits
+   * above Foundry's windows because it gates everything else.
+   * ------------------------------------------------------------------ */
+
+  .vm-license-card {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    z-index: 10000;
+    width: min(320px, calc(100vw - 32px));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px;
+    border: 1px solid rgb(176 106 179 / 0.4);
+    border-radius: 12px;
+    background: rgb(24 22 30 / 0.98);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.6);
+    color: rgb(235 235 240);
+    font-family: system-ui, sans-serif;
+  }
+
+  .vm-license-card header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+    border: none;
+    color: rgb(200 155 60);
+    font-size: 1rem;
+  }
+
+  .vm-license-card p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .vm-license-card .vm-license-note {
+    color: rgb(255 255 255 / 0.72);
+    font-size: 0.78rem;
+    margin-bottom: 8px;
+  }
+
+  .vm-license-card button {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.06);
+    color: rgb(235 235 240);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .vm-license-card button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .vm-license-card .vm-license-primary {
+    border-color: transparent;
+    background: rgb(200 155 60);
+    color: rgb(26 26 46);
+    font-weight: 700;
+  }
+
+  .vm-license-card .vm-license-dismiss {
+    min-height: 0;
+    padding: 2px;
+    border: none;
+    background: none;
+    color: rgb(255 255 255 / 0.4);
+    font-size: 0.75rem;
+    text-align: right;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Hide Foundry. Keep notifications and tooltips.
+   * ------------------------------------------------------------------ */
+
+  html[data-vm-sheet-only] #interface > :not(#notifications) {
+    display: none !important;
+  }
+
+  /* The rule above only reaches DIRECT children of #interface, and v13 nests
+   * much of its chrome one level deeper (or outside it entirely) — that is
+   * why the players list survived and floated over the mobile UI. Hide the
+   * known chrome by id as well, independent of where it sits in the DOM. */
+  html[data-vm-sheet-only] #players,
+  html[data-vm-sheet-only] #scene-navigation,
+  html[data-vm-sheet-only] #navigation,
+  html[data-vm-sheet-only] #sidebar,
+  html[data-vm-sheet-only] #ui-left,
+  html[data-vm-sheet-only] #ui-right,
+  html[data-vm-sheet-only] #ui-top,
+  html[data-vm-sheet-only] #ui-bottom,
+  html[data-vm-sheet-only] #controls,
+  html[data-vm-sheet-only] #scene-controls,
+  html[data-vm-sheet-only] #hotbar,
+  html[data-vm-sheet-only] #logo,
+  html[data-vm-sheet-only] #camera-views,
+  html[data-vm-sheet-only] #loading {
+    display: none !important;
+  }
+
+  html[data-vm-sheet-only] #interface {
+    background: none;
+    pointer-events: none;
+  }
+
+  html[data-vm-sheet-only] #notifications {
+    pointer-events: auto;
+  }
+
+  html[data-vm-sheet-only] #pause {
+    display: none !important;
+  }
+
+  /* The map is only hidden when the user turned it off; otherwise it stays
+   * as the live backdrop and the CanvasController makes it touch-navigable. */
+  html[data-vm-sheet-only]:not([data-vm-map]) #board {
+    display: none !important;
+  }
+
+  html[data-vm-map] #board {
+    /* Our gestures own the board: no browser scroll/zoom interference. */
+    touch-action: none;
+  }
+
+  /* With a live map there is no need for the artwork backdrop. */
+  html[data-vm-map] .vm-home {
+    display: none;
+  }
+
+  html[data-vm-sheet-only] body {
+    background: rgb(12 12 16);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Home screen: scene artwork + vignette (Swipe's no-canvas backdrop)
+   * ------------------------------------------------------------------ */
+
+  .vm-home {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .vm-home-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: rgb(20 18 26);
+    background-image: linear-gradient(160deg, rgb(38 28 48) 0%, rgb(16 14 22) 60%, rgb(10 10 14) 100%);
+  }
+
+  .vm-home-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center,
+      transparent 15%,
+      rgb(0 0 0 / 0.25) 30%,
+      rgb(0 0 0 / 0.75) 65%,
+      rgb(0 0 0 / 1) 100%);
+    pointer-events: none;
+  }
+
+  /* Slow, ambient drift on the artwork; parked while the drawer covers it. */
+  @media (prefers-reduced-motion: no-preference) {
+    .vm-home-bg {
+      animation: vm-kenburns 50s ease-in-out infinite alternate;
+    }
+
+    html[data-vm-drawer] .vm-home-bg {
+      animation-play-state: paused;
+    }
+  }
+
+  @keyframes vm-kenburns {
+    from { transform: scale(1); }
+    to { transform: scale(1.08) translateY(-1.5%); }
+  }
+
+  /* No boot veil: an overlay that hides Foundry before the shell exists is
+   * one failure away from a black screen. The shell simply takes over when
+   * it is ready (see SheetShell#build). */
+
+  /* ------------------------------------------------------------------ *
+   * Avatar carousel (bottom center)
+   * ------------------------------------------------------------------ */
+
+  .vm-carousel {
+    --vm-avatar: clamp(60px, calc((100vw - 180px) * 0.26), 76px);
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--vm-space-2) + var(--vm-safe-bottom));
+    transform: translateX(-50%);
+    z-index: var(--vm-z-shell);
+    width: clamp(180px, calc(100vw - 160px), 320px);
+    padding: var(--vm-space-2) 0;
+    animation: vm-rise var(--vm-anim-normal) var(--vm-ease) both;
+  }
+
+  .vm-carousel-label {
+    display: block;
+    margin: 0 auto var(--vm-space-1);
+    width: fit-content;
+    max-width: 90%;
+    padding: 2px 12px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.55);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--vm-text);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-carousel-label.vm-visible {
+    opacity: 1;
+  }
+
+  .vm-carousel-track {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    padding: var(--vm-space-1) calc(50% - var(--vm-avatar) / 2);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  }
+
+  .vm-carousel-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Proximity model (Swipe): --p is 0..1 distance-to-center, set by JS. */
+  .vm-carousel-avatar {
+    --p: 0;
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--vm-avatar);
+    height: var(--vm-avatar);
+    padding: 0;
+    border: 3px solid rgb(255 255 255 / 0.25);
+    border-radius: 50%;
+    background: var(--vm-surface);
+    box-shadow: 0 4px 6px rgb(0 0 0 / 0.5);
+    overflow: hidden;
+    scroll-snap-align: center;
+    opacity: calc(0.55 + var(--p) * 0.45);
+    transform: scale(calc(0.72 + var(--p) * 0.28));
+    filter: saturate(calc(0.3 + var(--p) * 0.7));
+    transition: border-color var(--vm-anim-fast) var(--vm-ease),
+      box-shadow var(--vm-anim-fast) var(--vm-ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-carousel-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    border: none;
+  }
+
+  .vm-carousel-avatar.vm-selected {
+    border-color: var(--vm-accent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--vm-accent) 55%, transparent),
+      0 4px 6px rgb(0 0 0 / 0.5);
+  }
+
+  .vm-hp {
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 7%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgb(0 0 0 / 0.55);
+    overflow: hidden;
+  }
+
+  .vm-hp-fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: rgb(110 190 80);
+    transition: width var(--vm-anim-normal) var(--vm-ease), background var(--vm-anim-normal) var(--vm-ease);
+  }
+
+  .vm-hp-fill.vm-low {
+    background: rgb(220 165 60);
+  }
+
+  .vm-hp-fill.vm-critical {
+    background: rgb(205 65 60);
+  }
+
+  /* The drawer covers the carousel; the keyboard needs its space. */
+  html[data-vm-drawer] .vm-carousel,
+  html[data-vm-keyboard="open"] .vm-carousel {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Floating button stack (bottom right) + dice bar
+   * ------------------------------------------------------------------ */
+
+  /* Anchor shared by the speed-dial and the dice bar. Raised above the
+   * mobile sheet's tab bar while the drawer is open so nothing overlaps. */
+  :root {
+    --vm-stack-b: calc(var(--vm-space-4) + var(--vm-safe-bottom));
+  }
+
+  html[data-vm-drawer] {
+    --vm-stack-b: calc(var(--vm-safe-bottom) + 64px * var(--vm-scale));
+  }
+
+  .vm-stack {
+    position: fixed;
+    right: calc(var(--vm-space-3) + var(--vm-safe-right));
+    bottom: var(--vm-stack-b);
+    z-index: calc(var(--vm-z-shell) + 1);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--vm-space-2);
+    animation: vm-rise var(--vm-anim-normal) var(--vm-ease) both;
+  }
+
+  @keyframes vm-rise {
+    from {
+      opacity: 0;
+      translate: 0 16px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  html[data-vm-keyboard="open"] .vm-stack {
+    display: none;
+  }
+
+  /* The single small trigger. */
+  .vm-stack-main {
+    position: relative;
+    width: calc(40px * var(--vm-scale));
+    height: calc(40px * var(--vm-scale));
+    display: grid;
+    place-items: center;
+    border: 2px solid rgb(255 255 255 / 0.3);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--vm-surface) 82%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--vm-text);
+    font-size: 1rem;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-stack-main .vm-icon {
+    transition: rotate var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-stack.vm-open .vm-stack-main {
+    border-color: var(--vm-accent);
+    color: var(--vm-accent);
+  }
+
+  .vm-stack.vm-open .vm-stack-main .vm-icon {
+    rotate: 45deg;
+  }
+
+  /* The fan-out actions. */
+  .vm-stack-dial {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--vm-space-2);
+  }
+
+  .vm-stack.vm-open .vm-stack-dial {
+    display: flex;
+    animation: vm-rise var(--vm-anim-fast) var(--vm-ease) both;
+  }
+
+  .vm-stack-btn {
+    position: relative;
+    width: calc(46px * var(--vm-scale));
+    height: calc(46px * var(--vm-scale));
+    display: grid;
+    place-items: center;
+    border: 2px solid rgb(255 255 255 / 0.25);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--vm-surface) 80%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--vm-text);
+    font-size: 1.1rem;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+    transition: transform var(--vm-anim-fast) var(--vm-ease), background var(--vm-anim-fast) var(--vm-ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-stack-btn:active {
+    transform: scale(0.95);
+  }
+
+  .vm-stack-btn.vm-selected {
+    border-color: var(--vm-accent);
+    color: var(--vm-accent);
+  }
+
+  .vm-stack-dot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--vm-accent);
+    border: 2px solid rgb(0 0 0 / 0.6);
+  }
+
+  .vm-stack-dot[hidden] {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Token movement joystick (bottom-left, toggled from the speed-dial)
+   * ------------------------------------------------------------------ */
+
+  .vm-joystick {
+    /* Raised clear of other modules' corner buttons (e.g. vnd-enhanced). */
+    --vm-joy-b: calc(var(--vm-stack-b) + 76px * var(--vm-scale));
+    position: fixed;
+    left: calc(var(--vm-space-3) + var(--vm-safe-left));
+    bottom: var(--vm-joy-b);
+    z-index: calc(var(--vm-z-shell) + 1);
+    touch-action: none;
+    animation: vm-rise var(--vm-anim-normal) var(--vm-ease) both;
+  }
+
+  html[data-vm-keyboard="open"] .vm-joystick,
+  html[data-vm-keyboard="open"] .vm-zoom {
+    display: none;
+  }
+
+  /* Zoom ± column, to the right of the joystick, same lifetime. */
+  .vm-zoom {
+    position: fixed;
+    left: calc(var(--vm-space-3) + var(--vm-safe-left) + 132px * var(--vm-scale));
+    bottom: calc(var(--vm-stack-b) + 96px * var(--vm-scale));
+    z-index: calc(var(--vm-z-shell) + 1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--vm-space-2);
+    animation: vm-rise var(--vm-anim-fast) var(--vm-ease) both;
+  }
+
+  .vm-zoom-btn {
+    width: calc(40px * var(--vm-scale));
+    height: calc(40px * var(--vm-scale));
+    display: grid;
+    place-items: center;
+    border: 2px solid rgb(255 255 255 / 0.25);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--vm-surface) 80%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--vm-text);
+    font-size: 1rem;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-zoom-btn:active {
+    transform: scale(0.95);
+    color: var(--vm-accent);
+  }
+
+  .vm-joy-base {
+    position: relative;
+    width: calc(120px * var(--vm-scale));
+    height: calc(120px * var(--vm-scale));
+    border-radius: 50%;
+    background: radial-gradient(circle at center, rgb(255 255 255 / 0.08), rgb(0 0 0 / 0.5));
+    border: 2px solid rgb(255 255 255 / 0.2);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.5), inset 0 0 22px rgb(0 0 0 / 0.4);
+    touch-action: none;
+  }
+
+  .vm-joy-ring {
+    position: absolute;
+    inset: 20%;
+    border-radius: 50%;
+    border: 1px dashed rgb(255 255 255 / 0.16);
+    pointer-events: none;
+  }
+
+  .vm-joy-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(50px * var(--vm-scale));
+    height: calc(50px * var(--vm-scale));
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 35% 30%,
+      color-mix(in srgb, var(--vm-accent) 82%, white),
+      var(--vm-accent));
+    border: 2px solid rgb(255 255 255 / 0.35);
+    box-shadow: 0 3px 10px rgb(0 0 0 / 0.6);
+    pointer-events: none;
+  }
+
+  .vm-joy-knob.vm-snap {
+    transition: transform 150ms var(--vm-ease);
+  }
+
+  .vm-dice-bar {
+    position: fixed;
+    right: calc(var(--vm-space-3) + var(--vm-safe-right));
+    bottom: calc(var(--vm-stack-b) + 48px * var(--vm-scale));
+    z-index: calc(var(--vm-z-shell) + 2);
+    display: flex;
+    flex-direction: column;
+    padding: var(--vm-space-2) 0;
+    border: 2px solid rgb(255 255 255 / 0.15);
+    border-radius: 23px;
+    background: color-mix(in srgb, var(--vm-surface) 88%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.6);
+    transform-origin: bottom right;
+    animation: vm-pop var(--vm-anim-fast) var(--vm-ease) both;
+  }
+
+  @keyframes vm-pop {
+    from {
+      opacity: 0;
+      scale: 0.9;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+
+  .vm-die-btn {
+    position: relative;
+    width: 46px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: transparent;
+    color: var(--vm-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-die-btn.vm-selected {
+    color: var(--vm-accent);
+  }
+
+  .vm-die-count {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--vm-accent);
+    color: #fff;
+    font-size: 0.65rem;
+    line-height: 1;
+  }
+
+  .vm-die-count:empty {
+    display: none;
+  }
+
+  .vm-die-roll {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vm-space-1);
+    margin: var(--vm-space-1) var(--vm-space-1) 0;
+    padding: var(--vm-space-2);
+    border: none;
+    border-radius: var(--vm-radius-lg);
+    background: var(--vm-accent);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    max-width: 120px;
+    transition: opacity var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-die-roll .vm-die-formula {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-die-roll.vm-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The sheet drawer: fullscreen, chromeless, dismissed by its grip.
+   * ------------------------------------------------------------------ */
+
+  html[data-vm-sheet-only] .vm-pinned {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: var(--vm-vvh, 100dvh) !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding-top: max(var(--vm-safe-top), 4px);
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    z-index: 10 !important; /* under dialogs, the stack and the chat panel */
+  }
+
+  html[data-vm-sheet-only] .vm-pinned > .window-header,
+  html[data-vm-sheet-only] .vm-pinned > header.window-header {
+    display: none !important;
+  }
+
+  html[data-vm-sheet-only] .vm-pinned .window-resizable-handle,
+  html[data-vm-sheet-only] .vm-pinned .window-resize-handle {
+    display: none !important;
+  }
+
+  html[data-vm-sheet-only] .vm-pinned .window-content {
+    width: 100%;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0;
+    /* Desktop-sized sheets may be wider than the phone: keep them reachable. */
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .vm-drawer-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .vm-drawer-close {
+    position: absolute;
+    top: calc(var(--vm-safe-top) + 2px);
+    right: var(--vm-space-2);
+    width: 38px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
+    border-radius: var(--vm-radius-md);
+    background: rgb(0 0 0 / 0.35);
+    color: rgb(255 255 255 / 0.75);
+    font-size: 0.9rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-drawer-close:active {
+    color: var(--vm-accent);
+  }
+
+  .vm-drawer-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 0.45);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Every other window (roll dialogs, item sheets, settings): floating
+   * but never larger than the screen.
+   * ------------------------------------------------------------------ */
+
+  /* Roll prompts, item sheets, config windows: centred on screen, sized to
+   * the viewport. Their z-index is deliberately NOT touched — Foundry raises
+   * the focused window itself, and overriding that flattens every window to
+   * one level, which is what left the damage prompt stuck behind the attack
+   * prompt. Our own surfaces stay below 100 so these always win. */
+  html[data-vm-sheet-only] .application:not(.vm-pinned),
+  html[data-vm-sheet-only] .app.window-app:not(.vm-pinned) {
+    /* Centred with inset + auto margins rather than a translate: Foundry
+     * positions windows with inline left/top, and a layered `translate`
+     * loses to its unlayered styles — which left the box hanging below
+     * the midpoint instead of centred on it. This needs no transform. */
+    position: fixed !important;
+    inset: 0 !important;
+    margin: auto !important;
+    translate: none !important;
+    transform: none !important;
+    width: min(94vw, 540px) !important;
+    max-width: 94vw !important;
+    height: fit-content !important;
+    max-height: calc(var(--vm-vvh, 100dvh) * 0.85) !important;
+    border-radius: var(--vm-radius-md);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.7);
+  }
+
+  /* Roll choices are the most-tapped buttons in play: give them a finger. */
+  html[data-vm-sheet-only] .application:not(.vm-pinned) .form-footer button,
+  html[data-vm-sheet-only] .application:not(.vm-pinned) .dialog-buttons button,
+  html[data-vm-sheet-only] .app.window-app:not(.vm-pinned) .dialog-buttons button {
+    min-height: var(--vm-touch-target);
+    font-size: 0.95rem;
+  }
+
+  /* Their header stays: it is the drag handle and the close button. */
+  html[data-vm-sheet-only] .application:not(.vm-pinned) .window-header,
+  html[data-vm-sheet-only] .app.window-app:not(.vm-pinned) .window-header {
+    touch-action: none;
+  }
+
+  html[data-vm-sheet-only] .application:not(.vm-pinned) .window-content,
+  html[data-vm-sheet-only] .app.window-app:not(.vm-pinned) .window-content {
+    /* min-height:0 lets a flex child actually shrink, so a tall dialog
+     * scrolls inside its capped height instead of overflowing the screen. */
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Chat hosted inside the bottom sheet
+   * ------------------------------------------------------------------ */
+
+  .vm-chat-panel .vm-sheet-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vm-sheet-body .vm-chat-hosted {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  .vm-sheet-body .vm-chat-hosted #chat-log,
+  .vm-sheet-body .vm-chat-hosted .chat-log,
+  .vm-sheet-body .vm-chat-hosted .chat-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .vm-sheet-body .vm-chat-hosted textarea,
+  .vm-sheet-body .vm-chat-hosted input {
+    font-size: max(var(--vm-font-min), 1em);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Target picker
+   * ------------------------------------------------------------------ */
+
+  .vm-target-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    width: 100%;
+    min-height: calc(var(--vm-touch-target) + 8px);
+    padding: var(--vm-space-1) var(--vm-space-4);
+    border: none;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-left: 4px solid transparent;
+    background: transparent;
+    color: var(--vm-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-target-row:active {
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  .vm-target-row img {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    object-fit: cover;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+  }
+
+  .vm-target-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Disposition stripe: hostile / neutral / friendly. */
+  .vm-target-row.vm-hostile {
+    border-left-color: rgb(200 70 60);
+  }
+
+  .vm-target-row.vm-neutral {
+    border-left-color: rgb(200 165 70);
+  }
+
+  .vm-target-row.vm-friendly {
+    border-left-color: rgb(90 165 100);
+  }
+
+  .vm-target-row.vm-targeted {
+    background: color-mix(in srgb, var(--vm-accent) 22%, transparent);
+    color: #fff;
+  }
+
+  .vm-target-row.vm-targeted .vm-icon {
+    color: var(--vm-accent);
+  }
+
+  .vm-target-clear {
+    color: var(--vm-text-dim);
+  }
+
+  .vm-target-empty {
+    margin: var(--vm-space-4);
+    color: var(--vm-text-dim);
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * First-run hint pill
+   * ------------------------------------------------------------------ */
+
+  .vm-hint {
+    position: fixed;
+    left: 50%;
+    bottom: calc(120px + var(--vm-safe-bottom));
+    transform: translateX(-50%);
+    z-index: var(--vm-z-shell);
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    padding: var(--vm-space-2) var(--vm-space-4);
+    border: 1px solid rgb(255 255 255 / 0.15);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.6);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: var(--vm-text);
+    font-size: 0.82rem;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: opacity 0.4s var(--vm-ease);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .vm-hint {
+      animation: vm-float 2.2s ease-in-out infinite;
+    }
+  }
+
+  .vm-hint .vm-icon {
+    color: var(--vm-accent);
+  }
+
+  .vm-hint.vm-out {
+    opacity: 0;
+  }
+
+  @keyframes vm-float {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -6px; }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Empty state (no actor available)
+   * ------------------------------------------------------------------ */
+
+  .vm-empty {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    padding: var(--vm-space-6);
+    color: var(--vm-text);
+    text-align: center;
+  }
+
+  .vm-empty-card {
+    display: grid;
+    gap: var(--vm-space-3);
+    justify-items: center;
+    max-width: 420px;
+  }
+
+  .vm-empty-card .vm-icon {
+    font-size: 2.4rem;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-empty-card h2 {
+    margin: 0;
+    border: none;
+    font-size: 1.2rem;
+  }
+
+  .vm-empty-card p {
+    margin: 0;
+    color: var(--vm-text-dim);
+  }
+}

@@ -1,0 +1,10 @@
+# Normalise line endings: the repo stores LF, so the zip built on Linux CI
+# ships LF regardless of the platform a release was tagged from.
+* text=auto eol=lf
+
+# Keep binaries untouched
+*.png binary
+*.jpg binary
+*.webp binary
+*.ogg binary
+*.webm binary
