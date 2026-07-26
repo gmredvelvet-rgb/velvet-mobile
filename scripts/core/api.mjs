@@ -12,6 +12,7 @@ import { DEVICES, HOOKS, INPUTS, MODULE_ID } from "./constants.mjs";
 import { services } from "./services.mjs";
 import { BottomSheet } from "../components/bottom-sheet.mjs";
 import { VelvetComponent } from "../components/component.mjs";
+import { registerAdapter, registeredSystems } from "../sheet/adapters.mjs";
 
 /**
  * Build the frozen API object.
@@ -73,6 +74,20 @@ export function createAPI({ isActive }) {
     /** Close the chat panel. */
     closeChat() {
       services.shell?.closeChat();
+    },
+    /**
+     * Teach Velvet Mobile how to render a game system's actors. Systems
+     * without an adapter still get the generic one; register to replace it.
+     * @param {string} systemId
+     * @param {{ model: (actor: Actor) => object, types?: string[] }} adapter
+     * @returns {() => void} Unregister.
+     */
+    registerAdapter(systemId, adapter) {
+      return registerAdapter(systemId, adapter);
+    },
+    /** @returns {string[]} System ids with a dedicated adapter. */
+    get systems() {
+      return registeredSystems();
     }
   });
 

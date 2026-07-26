@@ -16,10 +16,21 @@ import { L10N, MODULE_ID, MODULE_TITLE } from "../core/constants.mjs";
 import { Logger } from "../core/logger.mjs";
 import { LicenseClient } from "./license-client.mjs";
 
-/** @param {string} key @param {object} [data] */
-const L = (key, data) => (data
-  ? game.i18n.format(`${L10N}.License.${key}`, data)
-  : game.i18n.localize(`${L10N}.License.${key}`));
+/**
+ * Localize a `VELVETMOBILE.License.*` key, interpolating `data` when given.
+ *
+ * v14 merged `format` into `localize(key, data)` and removed `format`; v13
+ * only interpolates through `format` and ignores a second argument to
+ * `localize`. Neither call works on both, so ask the core which one it has.
+ * @param {string} key @param {object} [data]
+ */
+const L = (key, data) => {
+  const id = `${L10N}.License.${key}`;
+  if (!data) return game.i18n.localize(id);
+  return typeof game.i18n.format === "function"
+    ? game.i18n.format(id, data)
+    : game.i18n.localize(id, data);
+};
 
 /** Single card at a time. */
 const CARD_ID = `${MODULE_ID}-license-card`;

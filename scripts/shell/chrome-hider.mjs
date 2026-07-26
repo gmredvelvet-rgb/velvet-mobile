@@ -25,12 +25,15 @@ import { Logger } from "../core/logger.mjs";
  * only exist in some releases.
  *
  * Deliberately excluded: `notifications` (the only channel left to report
- * errors on a phone) and `chat` (the shell hosts the real chat log inside
- * its own panel).
+ * errors on a phone), and `chat` and `combat` (the shell hosts Foundry's
+ * real chat log and encounter tracker inside its own panels — hiding them
+ * here would win over the panel's own styling and show an empty sheet).
+ * Both live inside the sidebar, which is hidden, so they stay out of sight
+ * for as long as the shell is not borrowing them.
  */
 const CHROME = Object.freeze([
   "players", "nav", "controls", "hotbar", "sidebar",
-  "webrtc", "pause", "menu", "actors", "combat"
+  "webrtc", "pause", "menu", "actors"
 ]);
 
 /** Marker class; the actual `display: none` lives in shell.css. */

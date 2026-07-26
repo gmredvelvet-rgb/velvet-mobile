@@ -125,6 +125,12 @@ export class SheetShell {
   #lastTokenWarn = 0;
 
   /** @type {BottomSheet|null} */
+  #combatSheet = null;
+
+  /** @type {{parent: HTMLElement, next: Node|null}|null} Original tracker placement. */
+  #combatHome = null;
+
+  /** @type {BottomSheet|null} */
   #chatSheet = null;
 
   /** @type {{parent: HTMLElement, next: Node|null}|null} Original chat placement. */
@@ -257,6 +263,7 @@ export class SheetShell {
     this.#hooks.length = 0;
 
     this.closeChat();
+    this.closeCombat();
     this.#collapseDiceBar();
     this.#hideJoystick();
     this.#targetSheet?.dismiss();
@@ -710,6 +717,7 @@ export class SheetShell {
       action("move", "fa-solid fa-gamepad", t("Move"), () => this.#toggleJoystick()),
       action("dice", "fa-solid fa-dice-d20", t("Dice"), () => this.#toggleDiceBar()),
       action("chat", "fa-solid fa-comments", t("Chat"), () => this.toggleChat()),
+      action("combat", "fa-solid fa-swords", t("Combat"), () => this.toggleCombat()),
       action("settings", "fa-solid fa-gear", t("Settings"), () => game.settings.sheet.render(true))
     ];
     // Targeting reads canvas token objects, so it only exists in map mode.
@@ -1052,6 +1060,57 @@ export class SheetShell {
       ?.classList.toggle("vm-selected", game.user.targets.size > 0);
   }
 
+  /* -- Encounter tracker ------------------------------------------------------- */
+
+  toggleCombat() {
+    this.#combatSheet ? this.closeCombat() : this.openCombat();
+  }
+
+  /**
+   * Present Foundry's own encounter tracker in a bottom sheet, the same way
+   * the chat panel borrows the real chat log: the tracker is moved out of
+   * the hidden sidebar and handed straight back on dismissal. Borrowing the
+   * real thing means initiative, turn order and every system's tracker
+   * additions behave exactly as they do on the desktop.
+   */
+  openCombat() {
+    if (this.#combatSheet || !this.#active) return;
+    const tracker = SheetShell.#combatElement();
+    if (!tracker) return void Logger.warn("Encounter tracker element not found");
+
+    this.#combatSheet = new BottomSheet({
+      title: game.i18n.localize(`${L10N}.Shell.Combat`),
+      snapPoints: [0.5, 0.9],
+      className: "vm-combat-panel",
+      onDismiss: () => this.#onCombatDismissed()
+    });
+    this.#combatSheet.open();
+
+    this.#combatHome = { parent: tracker.parentElement, next: tracker.nextSibling };
+    this.#combatSheet.body.append(tracker);
+    tracker.classList.add("vm-combat-hosted");
+    this.#stack?.querySelector('[data-action="combat"]')?.classList.add("vm-selected");
+  }
+
+  closeCombat() {
+    this.#combatSheet?.dismiss();
+  }
+
+  /** Return the tracker to its original home in the sidebar. */
+  #onCombatDismissed() {
+    this.#combatSheet = null;
+    this.#stack?.querySelector('[data-action="combat"]')?.classList.remove("vm-selected");
+    const tracker = document.querySelector(".vm-combat-hosted");
+    const home = this.#combatHome;
+    if (tracker && home?.parent) {
+      tracker.classList.remove("vm-combat-hosted");
+      // The sibling may have been re-rendered away while we hosted it.
+      if (home.next && home.next.parentNode === home.parent) home.parent.insertBefore(tracker, home.next);
+      else home.parent.append(tracker);
+    }
+    this.#combatHome = null;
+  }
+
   /* -- Chat panel -------------------------------------------------------------- */
 
   toggleChat() {
@@ -1293,5 +1352,12 @@ export class SheetShell {
     const element = ui.chat?.element;
     if (element instanceof HTMLElement) return element;
     return element?.[0] ?? document.getElementById("chat");
+  }
+
+  /** @returns {HTMLElement|null} Foundry's encounter tracker element across versions. */
+  static #combatElement() {
+    const element = ui.combat?.element;
+    if (element instanceof HTMLElement) return element;
+    return element?.[0] ?? document.getElementById("combat");
   }
 }

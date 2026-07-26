@@ -1,5 +1,92 @@
 # Changelog
 
+## Unreleased — system-agnostic sheet adapters + full Pathfinder 2e support
+
+The mobile sheet no longer requires us to have written an adapter for your
+game system, and Pathfinder 2e goes from a thin port of the D&D 5e layout to
+a first-class implementation built on PF2e's own `Statistic` API.
+
+### Added — the module is now system-agnostic
+- **Generic adapter** (`sheet/adapters/generic.mjs`). Systems without a
+  dedicated adapter no longer fall straight through to a pinned desktop
+  sheet. The generic adapter discovers hit points, a defence value, and
+  ability- and skill-like blocks *by data shape* rather than by known paths,
+  and groups items by their declared type. Taps route through the
+  conventional entry points (`use` → `toMessage` → `roll` → chat card), so
+  most systems are usable on a phone with no per-system work at all.
+- **Adapter registry** (`sheet/adapters.mjs`). Adapters are registered per
+  `game.system.id` and can be replaced, so a system-specific companion module
+  can override our built-in support:
+  `game.modules.get("velvet-mobile").api.sheet.registerAdapter(id, { model, types })`.
+  Returns an unregister function; `api.sheet.systems` lists what is registered.
+- **Long-press on list rows.** Rows gained an `onLong` action (with
+  right-click as the desktop equivalent), used below for MAP attacks, carry
+  state and resource spending.
+
+### Added — Pathfinder 2e
+- **Strikes** instead of a raw weapon list: tap attacks at full modifier,
+  trailing buttons roll damage and critical damage, and a long press opens
+  the multiple-attack-penalty picker so the second and third attacks of a
+  turn use the right variant.
+- **Ammunition and reloading.** Strikes that consume ammunition now show what
+  is loaded and how much is left ("Bolts 1/1", "Empty") and gain a reload
+  button. Previously a weapon with a reload time could not be fired from a
+  phone at all: PF2e refuses the strike with "No ammunition is assigned…",
+  and its reload control is an anchored popover that will not open without a
+  desktop sheet to anchor to — only the GM could load the weapon. Reloading
+  uses the system's own `attach()`, so it behaves exactly as on the desktop;
+  weapons that merely expend ammunition (bows, slings) link a stack instead.
+  With one compatible stack the button reloads straight away, otherwise it
+  asks which. Unlike the desktop's one-round-per-click control, a tap fills
+  the magazine — a repeating crossbow is not worth five taps on a phone.
+- **Real spellcasting.** Spells are grouped into cantrips, spell ranks, focus
+  spells and rituals, each section badged with slots actually remaining
+  (summed across every spellcasting entry). Casting goes through the
+  spellcasting entry's `cast()` at the correct rank, falling back to a chat
+  card. Action costs show as ◆/◆◆/◆◆◆, R and F.
+- **Resources you touch mid-session:** hero points, focus points and the
+  dying track, tap to spend and hold to regain, with a recovery-check roll at
+  the correct DC.
+- **PF2e carry states.** Items are held in one or two hands, worn, carried or
+  stowed — not a boolean "equipped". Changing carry goes through
+  `actor.changeCarryType()`, and the current state shows on the row.
+- **Currency**, invested items, class DC, every movement speed, and
+  initiative rolled through `actor.initiative`.
+- **Perception and saves** roll through PF2e's `Statistic` objects, honouring
+  the user's own show-dialog preference rather than always skipping it.
+- Familiars are now supported alongside characters and NPCs.
+
+### Added — shell
+- **Encounter tracker in the quick-actions dial.** Foundry's own tracker is
+  borrowed into a bottom sheet the same way the chat log already was: the real
+  element is moved out of the hidden sidebar and handed straight back on
+  dismissal. Because it is the desktop tracker rather than a reimplementation,
+  initiative, turn order and whatever a system adds to it behave identically.
+  Opens at half height with a drag to full, and combatant rows get a
+  thumb-sized minimum height.
+
+### Changed
+- An adapter that produces a *visibly empty* sheet is now rejected. Previously
+  only a missing tab list triggered the native-sheet fallback, so an actor with
+  a full tab bar of empty lists (a familiar with no skills, an actor whose
+  derived getters threw) could present a blank mobile sheet. Content is now
+  measured in rows and ability cells, and an empty model falls through to the
+  generic adapter and then to the system's own sheet.
+- HP damage/heal writes to whichever HP path the system actually uses instead
+  of assuming `system.attributes.hp`.
+
+### Unchanged
+- **D&D 5e behaviour is byte-for-byte the same.** The adapter moved to
+  `sheet/adapters/dnd5e.mjs` with only its helper imports rewritten.
+
+### Fixed — Foundry v14 compatibility
+- **`game.i18n.format()` no longer exists in v14** (14.353 merged it into
+  `localize(key, data)`). Both licence helpers called it for the two
+  interpolated strings, so on v14 the activation card and the "Connected as
+  {tier} subscriber" notice threw `TypeError` — the GM could not reach the
+  licence menu at all. Both helpers now ask the core which call it supports,
+  so v13 keeps using `format` and v14 uses the merged `localize`.
+
 ## 0.13.0 — v14 readiness audit (2026-07-24)
 
 Full engineering audit against the released Foundry v14 API documentation.
