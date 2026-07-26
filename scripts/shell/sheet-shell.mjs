@@ -124,11 +124,11 @@ export class SheetShell {
   /** @type {number} Throttles the "no token" warning. */
   #lastTokenWarn = 0;
 
-  /** @type {BottomSheet|null} */
-  #combatSheet = null;
+  /** @type {HTMLElement|null} Vertical turn-order rail down the right edge. */
+  #combatRail = null;
 
-  /** @type {{parent: HTMLElement, next: Node|null}|null} Original tracker placement. */
-  #combatHome = null;
+  /** @type {[string, number][]} Hook handles tied to the open rail. */
+  #combatHooks = [];
 
   /** @type {BottomSheet|null} */
   #chatSheet = null;
@@ -1063,52 +1063,157 @@ export class SheetShell {
   /* -- Encounter tracker ------------------------------------------------------- */
 
   toggleCombat() {
-    this.#combatSheet ? this.closeCombat() : this.openCombat();
+    this.#combatRail ? this.closeCombat() : this.openCombat();
   }
 
   /**
-   * Present Foundry's own encounter tracker in a bottom sheet, the same way
-   * the chat panel borrows the real chat log: the tracker is moved out of
-   * the hidden sidebar and handed straight back on dismissal. Borrowing the
-   * real thing means initiative, turn order and every system's tracker
-   * additions behave exactly as they do on the desktop.
+   * The encounter's turn order, as a narrow rail down the right edge.
+   *
+   * Foundry's own tracker is a dense desktop widget that takes its height and
+   * scrolling from sidebar-scoped rules, so borrowing the element the way the
+   * chat panel does gave a panel that was populated but collapsed. This
+   * follows the same rule as the character sheet instead: never squeeze the
+   * desktop UI onto a phone, draw a phone UI over the same data.
+   *
+   * A rail rather than a bottom sheet because turn order is something you
+   * glance at *while* doing something else — it has to stay out of the way.
    */
   openCombat() {
-    if (this.#combatSheet || !this.#active) return;
-    const tracker = SheetShell.#combatElement();
-    if (!tracker) return void Logger.warn("Encounter tracker element not found");
-
-    this.#combatSheet = new BottomSheet({
-      title: game.i18n.localize(`${L10N}.Shell.Combat`),
-      snapPoints: [0.5, 0.9],
-      className: "vm-combat-panel",
-      onDismiss: () => this.#onCombatDismissed()
-    });
-    this.#combatSheet.open();
-
-    this.#combatHome = { parent: tracker.parentElement, next: tracker.nextSibling };
-    this.#combatSheet.body.append(tracker);
-    tracker.classList.add("vm-combat-hosted");
-    this.#stack?.querySelector('[data-action="combat"]')?.classList.add("vm-selected");
-  }
-
-  closeCombat() {
-    this.#combatSheet?.dismiss();
-  }
-
-  /** Return the tracker to its original home in the sidebar. */
-  #onCombatDismissed() {
-    this.#combatSheet = null;
-    this.#stack?.querySelector('[data-action="combat"]')?.classList.remove("vm-selected");
-    const tracker = document.querySelector(".vm-combat-hosted");
-    const home = this.#combatHome;
-    if (tracker && home?.parent) {
-      tracker.classList.remove("vm-combat-hosted");
-      // The sibling may have been re-rendered away while we hosted it.
-      if (home.next && home.next.parentNode === home.parent) home.parent.insertBefore(tracker, home.next);
-      else home.parent.append(tracker);
+    if (this.#combatRail || !this.#active) return;
+    if (!SheetShell.#visibleTurns().length) {
+      return void ui.notifications?.info(game.i18n.localize(`${L10N}.Shell.NoEncounter`));
     }
-    this.#combatHome = null;
+
+    this.#combatRail = VelvetComponent.el("nav", {
+      cls: "vm-combat-rail",
+      attrs: { "aria-label": game.i18n.localize(`${L10N}.Shell.Combat`) }
+    });
+    document.body.append(this.#combatRail);
+    this.#stack?.querySelector('[data-action="combat"]')?.classList.add("vm-selected");
+    this.#renderCombat();
+    // Slides in from the edge it lives on, so where it came from is obvious.
+    const rail = this.#combatRail;
+    Motion.slide(rail, "translateX(120%)", "translateX(0)").then(() => {
+      if (rail.isConnected) rail.style.transform = "";
+    });
+
+    // Follow the encounter live: turns advance, combatants join and die.
+    for (const name of ["updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"]) {
+      this.#combatHooks.push([name, Hooks.on(name, () => this.#renderCombat())]);
+    }
+  }
+
+  async closeCombat() {
+    for (const [name, id] of this.#combatHooks) Hooks.off(name, id);
+    this.#combatHooks.length = 0;
+    this.#stack?.querySelector('[data-action="combat"]')?.classList.remove("vm-selected");
+    // Cleared before the animation so a second tap opens a fresh rail rather
+    // than toggling the one that is on its way out.
+    const rail = this.#combatRail;
+    this.#combatRail = null;
+    if (!rail) return;
+    await Motion.slide(rail, "translateX(0)", "translateX(120%)", { duration: DURATION.FAST });
+    rail.remove();
+  }
+
+  /** @returns {Combatant[]} Turn order this user is allowed to see. */
+  static #visibleTurns() {
+    // `visible` already hides what this user has no business knowing about.
+    return (game.combat?.turns ?? []).filter((combatant) => combatant?.visible);
+  }
+
+  /** Draw (or redraw) the turn order into the rail. */
+  #renderCombat() {
+    const rail = this.#combatRail;
+    if (!rail) return;
+    const combat = game.combat;
+    const turns = SheetShell.#visibleTurns();
+    // The encounter ended while the rail was open: nothing left to track.
+    if (!turns.length) return void this.closeCombat();
+
+    const el = VelvetComponent.el;
+    const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
+
+    const close = el("button", {
+      cls: "vm-combat-close",
+      attrs: { type: "button", "aria-label": game.i18n?.localize("Close") ?? "Close" },
+      children: [VelvetComponent.icon("fa-solid fa-xmark")]
+    });
+    close.addEventListener("click", () => {
+      SheetShell.#haptic();
+      this.closeCombat();
+    });
+
+    // Head stays put while the turn list scrolls under it, so the way out is
+    // never more than one tap away however long the encounter runs.
+    const head = el("div", {
+      cls: "vm-combat-head",
+      children: [close, el("div", {
+        cls: "vm-combat-round",
+        children: [
+          el("span", { cls: "vm-combat-round-label", text: t("Round") }),
+          el("span", { cls: "vm-combat-round-value", text: String(combat.round ?? 0) })
+        ]
+      })]
+    });
+
+    const list = el("div", { cls: "vm-combat-list" });
+    for (const combatant of turns) {
+      list.append(this.#buildCombatantChip(combatant, combat));
+    }
+
+    rail.replaceChildren(head, list);
+    list.querySelector(".vm-combat-active")?.scrollIntoView({ block: "nearest" });
+  }
+
+  /**
+   * One combatant as a portrait chip. The rail is deliberately narrow, so the
+   * name lives in the tooltip and label rather than taking horizontal room.
+   * @param {Combatant} combatant @param {Combat} combat @returns {HTMLElement}
+   */
+  #buildCombatantChip(combatant, combat) {
+    const el = VelvetComponent.el;
+    const initiative = combatant.initiative;
+    const children = [
+      el("img", {
+        cls: "vm-combat-portrait",
+        attrs: { src: combatant.img || combatant.actor?.img || "icons/svg/mystery-man.svg", alt: "", loading: "lazy" }
+      })
+    ];
+    if (initiative !== null && initiative !== undefined) {
+      children.push(el("span", { cls: "vm-combat-init", text: String(initiative) }));
+    }
+
+    const classes = ["vm-combat-chip"];
+    if (combat.combatant?.id === combatant.id) classes.push("vm-combat-active");
+    if (combatant.isDefeated) classes.push("vm-combat-defeated");
+    if (combatant.hidden) classes.push("vm-combat-hidden");
+
+    const chip = el("button", {
+      cls: classes.join(" "),
+      attrs: {
+        type: "button",
+        "data-combatant-id": combatant.id,
+        "aria-label": combatant.name,
+        "data-tooltip": combatant.name
+      },
+      children
+    });
+    chip.addEventListener("click", () => this.#onCombatantTap(combatant));
+    return chip;
+  }
+
+  /** Centre the camera on whoever was tapped, when there is a map to pan. */
+  #onCombatantTap(combatant) {
+    SheetShell.#haptic();
+    if (!Settings.map || !canvas?.ready) return;
+    const token = combatant.token?.object;
+    if (!token) return;
+    try {
+      canvas.animatePan({ x: token.center?.x ?? token.x, y: token.center?.y ?? token.y, duration: 200 });
+    } catch (err) {
+      Logger.debug("Could not pan to the combatant", err);
+    }
   }
 
   /* -- Chat panel -------------------------------------------------------------- */
@@ -1354,10 +1459,4 @@ export class SheetShell {
     return element?.[0] ?? document.getElementById("chat");
   }
 
-  /** @returns {HTMLElement|null} Foundry's encounter tracker element across versions. */
-  static #combatElement() {
-    const element = ui.combat?.element;
-    if (element instanceof HTMLElement) return element;
-    return element?.[0] ?? document.getElementById("combat");
-  }
 }

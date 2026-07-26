@@ -74,6 +74,8 @@
       "Roll": "Roll",
       "Settings": "Settings",
       "Combat": "Encounter tracker",
+      "Round": "Round",
+      "NoEncounter": "No encounter in progress.",
       "SwipeHint": "Swipe up or tap your portrait",
       "NoActorTitle": "No character available",
       "NoActorHint": "Ask your GM to assign a character to your user, or grant you ownership of one with a token in the scene.",

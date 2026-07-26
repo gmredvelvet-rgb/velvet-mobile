@@ -822,45 +822,228 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Encounter tracker hosted inside the bottom sheet
+   * Encounter tracker
    *
-   * Same borrowing trick as the chat: Foundry's real tracker is moved in.
-   * The display override matters because a sidebar tab that is not the
-   * active one arrives hidden, and it must show once it is ours.
+   * Drawn by us from game.combat rather than borrowed from the sidebar:
+   * Foundry's tracker takes its height and scrolling from sidebar-scoped
+   * rules and collapses once moved out of it.
    * ------------------------------------------------------------------ */
 
-  .vm-combat-panel .vm-sheet-body {
+  /* Sizes are pinned with !important throughout: the module lives in a CSS
+   * layer and therefore loses to any unlayered rule another module ships,
+   * which is exactly what blew the portraits up to full size. Losing the
+   * cascade on someone else's element is good citizenship; losing it on our
+   * own overlay is a bug. */
+
+  .vm-combat-rail {
+    --vm-combat-size: calc(46px * var(--vm-scale));
+    /* How far the badge and the active ring bleed past the chip's circle. */
+    --vm-combat-bleed: 4px;
+
+    position: fixed;
+    top: calc(var(--vm-safe-top) + var(--vm-space-4));
+    right: calc(var(--vm-space-2) + var(--vm-safe-right));
+    /* Stops short of the speed-dial so the two never fight for the corner. */
+    bottom: calc(var(--vm-stack-b) + 72px * var(--vm-scale));
+    z-index: calc(var(--vm-z-shell) + 1);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: var(--vm-space-2);
+    padding: var(--vm-space-2);
+    /* Fully rounded ends: a capsule reads as a deliberate rail rather than
+       a cropped panel, and matches the circular chips inside it. */
+    border-radius: 999px;
+    /* Frosted rather than opaque, so the sheet stays readable underneath. */
+    background: color-mix(in srgb, var(--vm-surface) 80%, transparent);
+    backdrop-filter: blur(var(--vm-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--vm-blur)) saturate(140%);
+    border: 1px solid var(--vm-surface-border);
+    box-shadow: var(--vm-shadow-side);
+    overflow: hidden;
   }
 
-  .vm-sheet-body .vm-combat-hosted {
-    display: flex !important;
+  /* Head is pinned; only the turn list scrolls. */
+  .vm-combat-head {
+    flex: 0 0 auto;
+    display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: var(--vm-space-2);
+  }
+
+  /* Ghost button: present but quiet, so it never competes with the turn it
+     sits above. Fills in only while pressed. */
+  .vm-combat-close {
+    display: grid;
+    place-items: center;
+    width: calc(var(--vm-combat-size) * 0.58) !important;
+    height: calc(var(--vm-combat-size) * 0.58) !important;
+    padding: 0 !important;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--vm-text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background var(--vm-anim-fast) var(--vm-ease),
+                color var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-combat-close:active {
+    background: var(--vm-surface-raised);
+    color: var(--vm-text);
+  }
+
+  .vm-combat-round {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: calc(var(--vm-combat-size) * 0.92);
+    padding: var(--vm-space-1) var(--vm-space-1) calc(var(--vm-space-1) - 1px);
+    border-radius: var(--vm-radius-md);
+    background: color-mix(in srgb, var(--vm-accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--vm-accent) 34%, transparent);
+    line-height: 1;
+  }
+
+  .vm-combat-round-label {
+    color: var(--vm-text-dim);
+    font-size: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .vm-combat-round-value {
+    margin-top: 2px;
+    color: var(--vm-text);
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vm-combat-list {
     flex: 1;
     min-height: 0;
-    width: 100%;
-    height: 100%;
-    max-height: none;
-  }
-
-  /* The turn list scrolls; the encounter controls stay put above it. */
-  .vm-sheet-body .vm-combat-hosted .combat-tracker,
-  .vm-sheet-body .vm-combat-hosted #combat-tracker,
-  .vm-sheet-body .vm-combat-hosted .directory-list {
-    flex: 1 1 auto;
-    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--vm-space-2);
+    /* Side padding leaves room for the initiative badge and the active ring,
+       which both sit slightly outside the chip — a scroll container would
+       otherwise clip them or grow a horizontal scrollbar. */
+    padding: var(--vm-space-2) var(--vm-combat-bleed) 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Softens both ends instead of cutting portraits off flat, which is the
+       cue that the list keeps going. */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--vm-space-3),
+      #000 calc(100% - var(--vm-space-3)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--vm-space-3),
+      #000 calc(100% - var(--vm-space-3)), transparent 100%);
   }
 
-  /* Turn rows are desktop-sized; give thumbs something to actually hit. */
-  .vm-sheet-body .vm-combat-hosted .combatant {
-    min-height: var(--vm-touch-target);
+  .vm-combat-list::-webkit-scrollbar {
+    display: none;
   }
 
-  .vm-sheet-body .vm-combat-hosted input {
-    font-size: max(var(--vm-font-min), 1em);
+  .vm-combat-chip {
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--vm-combat-size) !important;
+    height: var(--vm-combat-size) !important;
+    padding: 0 !important;
+    border: 2px solid var(--vm-surface-border);
+    border-radius: 50%;
+    background: var(--vm-surface-raised);
+    cursor: pointer;
+    transition: transform var(--vm-anim-fast) var(--vm-ease),
+                border-color var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  /* The thread between portraits is what turns a stack of faces into an
+     order you can read top to bottom. */
+  .vm-combat-chip + .vm-combat-chip::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    width: 2px;
+    height: var(--vm-space-2);
+    background: var(--vm-surface-border);
+    transform: translateX(-50%);
+  }
+
+  .vm-combat-chip:active {
+    transform: scale(0.92);
+  }
+
+  .vm-combat-portrait {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    border: none !important;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .vm-combat-init {
+    position: absolute;
+    right: calc(var(--vm-combat-bleed) * -1);
+    bottom: calc(var(--vm-combat-bleed) * -1);
+    min-width: 1.6em;
+    padding: 1px 3px;
+    border-radius: var(--vm-radius-sm);
+    background: var(--vm-surface);
+    border: 1px solid var(--vm-surface-border);
+    color: var(--vm-text);
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Whose turn it is has to read at a glance, mid-fight and at arm's length:
+     bigger, ringed and lit, so it wins without any label. */
+  .vm-combat-active {
+    border-color: var(--vm-accent);
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 var(--vm-combat-bleed) color-mix(in srgb, var(--vm-accent) 28%, transparent),
+      0 0 16px color-mix(in srgb, var(--vm-accent) 55%, transparent);
+  }
+
+  .vm-combat-active:active {
+    transform: scale(1);
+  }
+
+  .vm-combat-active .vm-combat-init {
+    background: var(--vm-accent);
+    border-color: color-mix(in srgb, var(--vm-accent) 60%, #fff);
+    color: #fff;
+  }
+
+  .vm-combat-defeated {
+    border-color: transparent;
+  }
+
+  .vm-combat-defeated .vm-combat-portrait {
+    filter: grayscale(1);
+    opacity: 0.4;
+  }
+
+  .vm-combat-defeated .vm-combat-init {
+    color: var(--vm-text-dim);
+  }
+
+  /* Hidden combatants only ever reach a GM; mark them without hiding them. */
+  .vm-combat-hidden {
+    opacity: 0.6;
+    border-style: dashed;
   }
 
   /* ------------------------------------------------------------------ *
