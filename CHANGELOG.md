@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.0 — Encounter tracker rail (2026-07-26)
 
 ### Changed — the encounter tracker is drawn, not borrowed
 - **Turn order is now a rail down the right edge**, built from `game.combat`
