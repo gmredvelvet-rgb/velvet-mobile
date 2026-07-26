@@ -36,11 +36,11 @@
       },
       "StepSound": {
         "Name": "Sonido de pisada",
-        "Hint": "Suena una vez por casilla movida con el joystick. Velvet Mobile no incluye audio propio: apunta esto a un archivo de tu mundo. Déjalo vacío para el silencio. Solo lo oyes tú."
+        "Hint": "Suena una vez por casilla movida con el joystick. Solo lo oyes tú. Vacía los dos campos de pisada para el silencio."
       },
       "StepSoundAlt": {
         "Name": "Sonido de pisada (el otro pie)",
-        "Hint": "Segundo sonido opcional, alternado con el primero para que caminar no sea una misma muestra repetida."
+        "Hint": "Se alterna con el primero para que caminar no sea una misma muestra repetida. Si lo vacías, se usa el primer sonido para ambos pies."
       },
       "StepVolume": {
         "Name": "Volumen de las pisadas",

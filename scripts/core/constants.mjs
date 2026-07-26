@@ -39,6 +39,17 @@ export const MOVE_STYLES = Object.freeze({
   DIRECT: "direct"
 });
 
+/**
+ * Footstep samples shipped with the module, as paths from the Foundry data
+ * root. The two are deliberately not a matched pair — they differ by ~5 dB
+ * and ~15ms of tail — because two identical samples alternating read as a
+ * loop rather than as walking.
+ */
+export const STEP_SOUNDS = Object.freeze({
+  FIRST: `modules/${MODULE_ID}/assets/sounds/step-1.ogg`,
+  SECOND: `modules/${MODULE_ID}/assets/sounds/step-2.ogg`
+});
+
 /** Peak lift of a weighted step, as a fraction of the token's own size. */
 export const STEP_LIFT = 0.16;
 

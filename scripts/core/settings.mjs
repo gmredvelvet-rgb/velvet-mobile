@@ -4,7 +4,7 @@
  * @module core/settings
  */
 
-import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES } from "./constants.mjs";
+import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES, STEP_SOUNDS } from "./constants.mjs";
 import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
 
@@ -112,16 +112,16 @@ export class Settings {
       default: MOVE_STYLES.WEIGHTED
     });
 
-    /* Footstep audio ships with no sound of its own: audio is licensed
-       separately from code, so the files are the user's to choose. Empty
-       means silent, which is also the safe default in a shared game. */
+    /* Two samples rather than one, alternated, so a walk does not become the
+       same sound on repeat. Clearing a field falls back to the other; clear
+       both for silence. */
     game.settings.register(MODULE_ID, SETTINGS.STEP_SOUND, {
       name: localize("StepSound.Name"),
       hint: localize("StepSound.Hint"),
       scope: "client",
       config: true,
       type: String,
-      default: "",
+      default: STEP_SOUNDS.FIRST,
       filePicker: "audio"
     });
 
@@ -131,7 +131,7 @@ export class Settings {
       scope: "client",
       config: true,
       type: String,
-      default: "",
+      default: STEP_SOUNDS.SECOND,
       filePicker: "audio"
     });
 

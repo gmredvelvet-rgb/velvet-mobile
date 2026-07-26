@@ -20,11 +20,12 @@
   behaviour.
 
 ### Added
-- **Footstep sounds**, one per square, alternating between two configurable
-  files so a walk is not one sample on repeat. Only the moving player hears
-  them. Velvet Mobile ships no audio of its own — audio is licensed
-  separately from code — so both settings start empty and silent; point them
-  at files in your own world.
+- **Footstep sounds**, one per square, heard only by the moving player. Two
+  samples ship with the module and alternate, because the same sound on
+  repeat reads as a loop rather than as walking; they are deliberately not a
+  matched pair, differing by about 5 dB and 15 ms of tail. Both are
+  file-picker settings, so you can point them at your own audio, and clearing
+  both gives silence.
 
 ### Fixed
 - **Diagonal and hexagonal movement were wrong.** The old code added
