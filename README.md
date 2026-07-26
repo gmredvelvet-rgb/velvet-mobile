@@ -36,6 +36,7 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
 - **Floating buttons** (always on top, even over the sheet):
   - 🎲 **dice roller** — tap dice to build a pool (2d6 + 1d20…), then Roll;
   - 💬 **chat** — Foundry's real chat log in a bottom sheet (messages, rolls and input all work), with an unread dot;
+  - ⚔️ **encounter tracker** — turn order as a slim rail down the right edge: portraits with initiative, the active turn ringed and lit, defeated greyed out, round at the top. Tap anyone to centre the camera on them. Updates live as turns advance.
   - ⚙️ **settings** — the escape hatch.
 - **Chat auto-open** — incoming rolls (or all messages, per setting) open the chat at half height; it hides itself after a few seconds unless you touch it.
 - **No canvas at all** — mobile clients run with Foundry's `core.noCanvas`, so the game canvas is never created: a large memory and battery win (reverted automatically if you turn mobile mode off).

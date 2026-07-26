@@ -74,6 +74,8 @@
       "Roll": "Tirar",
       "Settings": "Ajustes",
       "Combat": "Rastreador de combate",
+      "Round": "Ronda",
+      "NoEncounter": "No hay ningún combate en curso.",
       "SwipeHint": "Desliza hacia arriba o toca tu retrato",
       "NoActorTitle": "Sin personaje disponible",
       "NoActorHint": "Pide a tu GM que asigne un personaje a tu usuario, o que te dé propiedad de uno con ficha en la escena.",

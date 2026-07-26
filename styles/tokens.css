@@ -51,6 +51,12 @@
     --vm-accent: rgb(176 106 179);
     --vm-backdrop: rgb(0 0 0 / 0.45);
     --vm-shadow: 0 -8px 32px rgb(0 0 0 / 0.5);
+    /* Surfaces anchored to a side edge cast their shadow sideways, not up.  */
+    --vm-shadow-side: -10px 0 30px rgb(0 0 0 / 0.45);
+    /* Frosted glass. Used by floating surfaces that sit over live content,  */
+    /* so the map or sheet stays legible underneath instead of being boxed   */
+    /* out by a slab of opaque colour.                                       */
+    --vm-blur: 14px;
 
     /* Stacking ------------------------------------------------------- *
      * Every Velvet surface lives BELOW 100, where Foundry starts its own

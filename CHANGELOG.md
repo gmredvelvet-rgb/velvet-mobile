@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Changed — the encounter tracker is drawn, not borrowed
+- **Turn order is now a rail down the right edge**, built from `game.combat`
+  instead of hosting Foundry's own tracker element. Hosting worked for the
+  chat log because a list of messages reads the same at any width; the
+  tracker is a dense desktop widget that takes its height and scrolling from
+  sidebar-scoped rules, so once moved out of the sidebar it arrived populated
+  but collapsed to nothing. This follows the rule the character sheet already
+  follows: never squeeze the desktop UI onto a phone, draw a phone UI over
+  the same data.
+- A rail rather than a bottom sheet, because turn order is something you
+  glance at *while* doing something else. It stops short of the speed-dial so
+  the two never fight for the corner, and closes from its own button instead
+  of by reopening the dial.
+- Frosted capsule so the sheet stays readable underneath; a thread between
+  portraits that turns a stack of faces into a readable order; the active
+  turn ringed, lit and enlarged with its initiative badge inverted to the
+  accent; round labelled and given its own hierarchy; defeated greyed out,
+  hidden dashed; the list fades at both ends rather than cutting portraits
+  off flat. Enters and leaves through the Motion engine, so reduced-motion is
+  honoured.
+- Sizes are pinned with `!important`. The module lives in a CSS layer and so
+  loses to any unlayered rule another module ships — which is exactly what
+  blew the portraits up to full size on a heavily modded world. Losing the
+  cascade on someone else's element is good citizenship; losing it on our own
+  overlay is a bug.
+- Reads nothing but core Foundry (`game.combat`, `Combatant`,
+  `canvas.animatePan`), so it behaves identically on every game system.
+  `ChromeHider` goes back to hiding `ui.combat` now that nothing borrows it.
+
 ## 0.14.2 — Encounter tracker actually shows the encounter (2026-07-25)
 
 ### Fixed
