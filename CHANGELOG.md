@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.18.1 — footsteps go quiet (2026-07-26)
+
+### Changed
+- **The two footstep samples have been withdrawn.** They were not good enough
+  to ship, and a sound every player hears on every square is not the place to
+  settle for "good enough" — a footstep that grates is worse than no footstep
+  at all. Better ones will land in a future release.
+- **Footsteps are silent by default and the feature is otherwise unchanged.**
+  Both settings remain file pickers, so pointing them at your own audio works
+  exactly as before, and anyone who had already done so is unaffected. Their
+  hints now say what makes a footstep work: around 100 ms, and two samples
+  that are deliberately not identical.
+
+Nothing else changed. The weighted step, the movement API and the hexagonal
+grid fixes from 0.18.0 are untouched.
+
 ## 0.18.0 — joystick movement has weight (2026-07-26)
 
 ### Documentation

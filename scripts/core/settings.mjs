@@ -113,8 +113,9 @@ export class Settings {
     });
 
     /* Two samples rather than one, alternated, so a walk does not become the
-       same sound on repeat. Clearing a field falls back to the other; clear
-       both for silence. */
+       same sound on repeat. Both default to empty — no audio ships yet — so
+       footsteps are silent until pointed at a file. Clearing one field falls
+       back to the other; clear both for silence. */
     game.settings.register(MODULE_ID, SETTINGS.STEP_SOUND, {
       name: localize("StepSound.Name"),
       hint: localize("StepSound.Hint"),

@@ -36,11 +36,11 @@
       },
       "StepSound": {
         "Name": "Sonido de pisada",
-        "Hint": "Suena una vez por casilla movida con el joystick. Solo lo oyes tú. Vacía los dos campos de pisada para el silencio."
+        "Hint": "Suena una vez por casilla movida con el joystick, y solo lo oyes tú. El módulo aún no incluye audio, así que empieza vacío y en silencio: apúntalo a un archivo para darle voz al joystick. Lo que mejor funciona son unos 100 ms; bastante más largo se solapa con el paso siguiente."
       },
       "StepSoundAlt": {
         "Name": "Sonido de pisada (el otro pie)",
-        "Hint": "Se alterna con el primero para que caminar no sea una misma muestra repetida. Si lo vacías, se usa el primer sonido para ambos pies."
+        "Hint": "Se alterna con el primero para que caminar no sea una misma muestra repetida. Funciona mejor si no es idéntico: basta con que sea algo más flojo o más corto. Déjalo vacío para usar el primer sonido en ambos pies."
       },
       "StepVolume": {
         "Name": "Volumen de las pisadas",

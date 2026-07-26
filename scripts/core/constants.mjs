@@ -41,13 +41,18 @@ export const MOVE_STYLES = Object.freeze({
 
 /**
  * Footstep samples shipped with the module, as paths from the Foundry data
- * root. The two are deliberately not a matched pair — they differ by ~5 dB
- * and ~15ms of tail — because two identical samples alternating read as a
- * loop rather than as walking.
+ * root. Empty until samples worth shipping exist: the setting is a file
+ * picker either way, so an empty default is silent rather than broken, and
+ * filling these in is the only change needed to give the joystick a voice.
+ *
+ * Whatever lands here should not be a matched pair. Two identical samples
+ * alternating read as a loop rather than as walking; roughly 5 dB and 15 ms
+ * of tail between them is enough, with their transients landing at the same
+ * offset so the cadence stays even.
  */
 export const STEP_SOUNDS = Object.freeze({
-  FIRST: `modules/${MODULE_ID}/assets/sounds/step-1.ogg`,
-  SECOND: `modules/${MODULE_ID}/assets/sounds/step-2.ogg`
+  FIRST: "",
+  SECOND: ""
 });
 
 /** Peak lift of a weighted step, as a fraction of the token's own size. */

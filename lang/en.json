@@ -36,11 +36,11 @@
       },
       "StepSound": {
         "Name": "Footstep sound",
-        "Hint": "Played once per square moved with the joystick. Only you hear it. Clear both footstep fields for silence."
+        "Hint": "Played once per square moved with the joystick, and only you hear it. No audio ships with the module yet, so this starts empty and silent — point it at a file to give the joystick a voice. Around 100 ms works best; anything much longer overlaps the next step."
       },
       "StepSoundAlt": {
         "Name": "Footstep sound (other foot)",
-        "Hint": "Alternated with the first so a walk does not become one sample on repeat. Clearing it reuses the first sound for both feet."
+        "Hint": "Alternated with the first so a walk does not become one sample on repeat. Works best when it is not an exact match — a little quieter or shorter is enough. Leave it empty to use the first sound for both feet."
       },
       "StepVolume": {
         "Name": "Footstep volume",
