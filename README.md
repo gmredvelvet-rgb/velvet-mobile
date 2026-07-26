@@ -15,7 +15,8 @@
 | Requirement | Detail |
 |---|---|
 | Foundry VTT | **v13** minimum (verified). v14-ready by audit — see [Compatibility](#compatibility). |
-| Subscription | An **active, qualifying Patreon** subscription to [The GM Studio](https://www.patreon.com/TheGMStudio). Only the **GM** authorises; players never see a prompt. |
+| Subscription | An **active, qualifying Patreon** subscription to [The GM Studio](https://www.patreon.com/TheGMStudio), for as long as you use the module — see [Licensing](#licensing). Only the **GM** authorises; players never see a prompt. |
+| Internet | Required while playing. The licence is verified periodically against a licence server. |
 | Device | A touch device (phone/tablet) for the mobile experience. Desktop is used for testing via *Force Phone/Tablet*. |
 
 ## Installation
@@ -68,6 +69,16 @@ Velvet Mobile requires an active Patreon subscription — the same one that unlo
 
 Manage it any time from *Configure Settings → Velvet Mobile → **Manage licence***: connect, re-authorise, paste an auth code (useful on phones, where popups are often blocked), or release the installation slot to move it to another server or browser. Authorising or releasing takes effect on every connected client immediately, with no reloads.
 
+### What happens if the subscription lapses
+
+**Please read this before subscribing.** Velvet Mobile is a subscription, not a one-off purchase, and the module re-checks the subscription periodically against the licence server. So, plainly:
+
+- **If the subscription lapses, the mobile interface stops working.** The module deactivates itself and stops taking over the UI.
+- **Nothing else is affected.** Foundry, your world, your actors, your scenes, your journals and your settings are untouched. The phone simply falls back to Foundry's standard interface — no data is altered, withheld or lost, and no content becomes unopenable. Resubscribing turns it straight back on.
+- **An internet connection is required while playing.** Verification is periodic, so a client that cannot reach the licence server deactivates the mobile interface until it can. Fully offline or air-gapped games are not supported.
+
+If a perpetual licence is what you need, Velvet Mobile is not that today. I would rather say so here than have anyone find out mid-campaign.
+
 See [LICENSE](LICENSE) for the full proprietary terms.
 
 ## Settings (all per-client)
@@ -107,6 +118,12 @@ No. The module only activates on devices detected as phones/tablets (or when for
 
 **Do players need their own Patreon subscription?**
 No. Only the GM authorises, and that unlocks the world for everyone connected.
+
+**If I stop subscribing, does the module keep working?**
+No. The mobile interface deactivates itself — see [What happens if the subscription lapses](#what-happens-if-the-subscription-lapses). Your Foundry install, world and data are untouched; the phone falls back to Foundry's normal interface, and resubscribing turns it straight back on.
+
+**Can I use it offline?**
+No. The licence is verified periodically over the internet, and a client that cannot reach the licence server deactivates the mobile interface until it can.
 
 **The mobile UI didn't appear on my phone.**
 Check *Configure Settings → Velvet Mobile → Mobile Mode*. If it's on *Auto-detect* and your device wasn't recognised, set *Force Phone* and reload. Confirm the GM has authorised the licence.

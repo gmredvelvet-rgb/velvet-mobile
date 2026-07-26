@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased — joystick movement has weight
+## 0.18.0 — joystick movement has weight (2026-07-26)
+
+### Documentation
+- **The subscription terms are now stated plainly in the README**, in the
+  requirements table, in a dedicated *What happens if the subscription lapses*
+  section and in the FAQ. Velvet Mobile is a subscription rather than a one-off
+  purchase: when it lapses the mobile interface deactivates itself, Foundry and
+  your world are left untouched, and an internet connection is needed while
+  playing because the licence is verified periodically. None of this is a change
+  in behaviour — it is what the module has always done, written down where
+  people can read it *before* they subscribe rather than discover it afterwards.
 
 ### Changed
 - **The joystick moves tokens through `TokenDocument#move()`**, the movement
