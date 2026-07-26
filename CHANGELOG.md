@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.16.0 — v14 compatibility audit (2026-07-26)
 
 ### Added
 - **`VelvetComponent#scope()`** — a disposable child scope with the same
