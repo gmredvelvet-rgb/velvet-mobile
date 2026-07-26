@@ -314,6 +314,172 @@ const promptReload = (actor, weapon, ammunition) => safe(async () => {
   if (picked) await load(picked);
 });
 
+/* -- Roll-option toggles --------------------------------------------------- */
+
+/**
+ * One toggle row: the checkbox (or dropdown) PF2e draws above its strikes.
+ * @param {Actor} actor
+ * @param {object} toggle  An entry of `actor.synthetics.toggles[domain]`.
+ * @returns {object}
+ */
+function toggleRow(actor, toggle) {
+  const label = maybeLocalize(toggle.label, text(toggle.label, toggle.option));
+  const suboptions = (toggle.suboptions ?? []).map((sub) => ({
+    value: sub.value,
+    label: maybeLocalize(sub.label, text(sub.label, sub.value)),
+    selected: sub.selected === true
+  }));
+  const selected = suboptions.find((sub) => sub.selected) ?? suboptions[0] ?? null;
+  const alwaysActive = toggle.alwaysActive === true;
+  const checked = toggle.checked === true || alwaysActive;
+
+  const set = (value, suboption) => safe(() =>
+    actor.toggleRollOption(toggle.domain, toggle.option, toggle.itemId ?? null, value, suboption ?? null));
+
+  // A single suboption is fixed — the desktop disables its dropdown too.
+  const pick = suboptions.length > 1
+    ? safe(async () => {
+      const picked = await foundry.applications.api.DialogV2.wait({
+        window: { title: label },
+        position: { width: 320 },
+        content: `<p style="margin: 0 0 .5rem;">${foundry.utils.escapeHTML(t("ToggleHint"))}</p>`,
+        buttons: suboptions.slice(0, 8).map((sub, i) => ({
+          action: `opt${i}`,
+          label: sub.label,
+          default: sub.selected,
+          callback: () => sub.value
+        })),
+        rejectClose: false
+      });
+      if (picked) await set(checked, picked)();
+    })
+    : undefined;
+
+  /* An always-active toggle is a dropdown with no checkbox, so tapping it
+     picks the option; everything else flips, with the option one tap aside. */
+  let onTap;
+  if (alwaysActive) onTap = pick;
+  else if (toggle.enabled !== false || checked) onTap = set(!checked, selected?.value);
+
+  return {
+    id: `${toggle.domain}:${toggle.option}`,
+    label,
+    sub: suboptions.length ? (selected?.label ?? "") : "",
+    badge: !alwaysActive && checked ? "✓" : "",
+    prof: alwaysActive ? undefined : checked,
+    onTap,
+    onLong: alwaysActive ? undefined : pick,
+    actions: pick ? [{ icon: "fa-solid fa-list-ul", label: t("ToggleOption"), onTap: pick }] : []
+  };
+}
+
+/**
+ * The options PF2e's own Actions tab shows above the strikes — Current Form,
+ * Double Slice, Hunt Prey, One Shot One Kill…
+ *
+ * They are `RollOption` rule elements, which the system collects into
+ * `actor.synthetics.toggles` as `{ domain: { option: toggle } }`, and writes
+ * back through `actor.toggleRollOption()`. Only the ones placed in the
+ * actions area are ours; the rest belong next to a specific statistic.
+ * @param {Actor} actor
+ * @returns {object[]}
+ */
+function toggleRows(actor) {
+  const domains = actor.synthetics?.toggles ?? {};
+  return Object.values(domains)
+    .flatMap((domain) => Object.values(domain ?? {}))
+    .filter((toggle) => toggle && (toggle.placement ?? "actions") === "actions")
+    .map((toggle) => toggleRow(actor, toggle));
+}
+
+/* -- Encounter / exploration / downtime ------------------------------------ */
+
+/**
+ * Which of the three panels PF2e's Actions tab would file this item under,
+ * or null when it belongs to none of them.
+ *
+ * Mirrors the system's own pass (`#prepareAbilities`): every `action` item
+ * qualifies whatever it costs, feats only when they cost an action, and the
+ * `exploration` / `downtime` traits pull an item out of the encounter list.
+ * @param {Item} item
+ * @returns {"encounter"|"exploration"|"downtime"|null}
+ */
+function actionPanel(item) {
+  const qualifies = item?.type === "action" || (item?.type === "feat" && Boolean(actionCost(item)));
+  if (!qualifies || item.suppressed === true) return null;
+  const traits = traitsOf(item);
+  if (traits.includes("exploration")) return "exploration";
+  if (traits.includes("downtime")) return "downtime";
+  return "encounter";
+}
+
+/** Traits worth showing on a row — rarity is noise on a phone. */
+const displayTraits = (item) => traitsOf(item)
+  .filter((trait) => !["common", "uncommon", "rare", "unique"].includes(trait))
+  .slice(0, 3).map(titleCase).join(" · ");
+
+/**
+ * The exploration activities currently running.
+ *
+ * `system.exploration` is a plain list of item ids on the actor. The desktop
+ * sheet's `toggle-exploration` handler drops ids whose item is gone before
+ * writing, and so do we — a stale id would otherwise survive forever. An
+ * actor whose data model predates the field, or a module that has replaced
+ * it with something else, gets an empty list rather than a thrown section.
+ * @param {Actor} actor
+ * @returns {string[]}
+ */
+function explorationIds(actor) {
+  const raw = actor.system?.exploration;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((id) => actor.items?.has(id));
+}
+
+/**
+ * Start or stop an exploration activity.
+ * @param {Actor} actor
+ * @param {Item} item
+ */
+const toggleExploration = (actor, item) => safe(async () => {
+  const current = explorationIds(actor);
+  const next = current.includes(item.id)
+    ? current.filter((id) => id !== item.id)
+    : [...current, item.id];
+  await actor.update({ "system.exploration": next });
+});
+
+/**
+ * Exploration activities — Avoid Notice, Search, Follow the Expert…
+ *
+ * A tap starts or stops the activity the way the desktop's toggle does; the
+ * chat button posts the card, which is what a tap does everywhere else, so
+ * neither gesture is lost. Active ones sort to the top, mirroring the
+ * "Active" group the desktop sheet splits out.
+ * @param {Actor} actor
+ * @param {Item[]} items
+ * @returns {object[]}
+ */
+function explorationRows(actor, items) {
+  const active = new Set(explorationIds(actor));
+  return items
+    .map((item) => ({ item, on: active.has(item.id) }))
+    .sort((a, b) => (Number(b.on) - Number(a.on)) || a.item.name.localeCompare(b.item.name))
+    .map(({ item, on }) => ({
+      id: item.id,
+      img: item.img,
+      label: item.name,
+      sub: [on ? t("ExplorationActive") : "", displayTraits(item)].filter(Boolean).join(" · "),
+      badge: on ? "✓" : "",
+      onTap: toggleExploration(actor, item),
+      actions: [{
+        icon: "fa-solid fa-comment",
+        label: t("SendToChat"),
+        onTap: usePf2eItem(actor, item)
+      }],
+      description: describe(item)
+    }));
+}
+
 /* -- Strikes --------------------------------------------------------------- */
 
 /**
@@ -513,20 +679,42 @@ export function model(actor) {
     .filter((a) => a && a.type === "strike" && a.visible !== false)
     .map((strike, index) => strikeRow(actor, strike, index)), []);
 
-  /* Activatable feats and actions, grouped with the strikes. */
-  const activities = attempt("activities", () => (actor.items?.contents ?? [])
-    .filter((item) => ["action", "feat"].includes(item.type) && actionCost(item))
+  /* Combat options — the checkboxes the desktop draws above its strikes. */
+  const toggles = attempt("toggles", () => toggleRows(actor), []);
+
+  /* The three panels the desktop splits its Actions tab into, bucketed in a
+     single pass so no item can ever land in two of them. */
+  const panels = attempt("actions", () => {
+    const buckets = { encounter: [], exploration: [], downtime: [] };
+    for (const item of actor.items?.contents ?? []) {
+      const panel = actionPanel(item);
+      // Encounter keeps its long-standing rule — only things that cost an
+      // action — so passive abilities stay where they have always been, in
+      // the Features tab. Exploration and downtime follow the desktop and
+      // take everything, since most of those activities cost nothing.
+      if (!panel || (panel === "encounter" && !actionCost(item))) continue;
+      buckets[panel].push(item);
+    }
+    return buckets;
+  }, { encounter: [], exploration: [], downtime: [] });
+
+  /** Rows for items whose tap simply uses them. @param {Item[]} items */
+  const useRows = (items) => [...items]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((item) => ({
       id: item.id,
       img: item.img,
       label: item.name,
-      sub: traitsOf(item).filter((trait) => !["common", "uncommon", "rare", "unique"].includes(trait))
-        .slice(0, 3).map(titleCase).join(" · "),
+      sub: displayTraits(item),
       badge: costBadge(item),
       onTap: usePf2eItem(actor, item),
       description: describe(item)
-    })), []);
+    }));
+
+  /* Activatable feats and actions, grouped with the strikes. */
+  const activities = attempt("activities", () => useRows(panels.encounter), []);
+  const exploration = attempt("exploration", () => explorationRows(actor, panels.exploration), []);
+  const downtime = attempt("downtime", () => useRows(panels.downtime), []);
 
   /* Inventory, with PF2e's carry states rather than a boolean equipped flag. */
   const inventory = attempt("inventory", () => (actor.items?.contents ?? [])
@@ -621,7 +809,10 @@ export function model(actor) {
   }, []);
 
   const features = attempt("features", () => (actor.items?.contents ?? [])
-    .filter((item) => FEATURE_TYPES.has(item.type) && !actionCost(item))
+    // Exploration and downtime activities have their own sections now, and
+    // most of them are costless — without this they would show up twice.
+    .filter((item) => FEATURE_TYPES.has(item.type) && !actionCost(item)
+      && !["exploration", "downtime"].includes(actionPanel(item)))
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((item) => ({
       id: item.id,
@@ -647,7 +838,12 @@ export function model(actor) {
 
     /* Every movement type the creature has, not just its walk speed. */
     const speeds = system.movement?.speeds ?? {};
-    const walk = num(speeds.land?.value, speeds.land, system.attributes?.speed?.total, system.attributes?.speed?.value);
+    // `num()` evaluates every argument, so a single call would touch the
+    // deprecated `system.attributes.speed` getter on every build even when
+    // the modern path already answered. PF2e deprecated it in 7.5.0 and
+    // removes it in 8.0.0.
+    const walk = num(speeds.land?.value, speeds.land)
+      ?? num(system.attributes?.speed?.total, system.attributes?.speed?.value);
     chips.push({ label: t("Speed"), value: `${walk ?? 0}` });
 
     const classDc = num(
@@ -685,14 +881,20 @@ export function model(actor) {
     });
   }
 
-  if (strikes.length || activities.length) {
+  /* Combat, in the desktop's own order: options, strikes, then the three
+     action panels. Every section is conditional — a creature with nothing
+     but exploration activities must not get an empty Strikes list. */
+  if (strikes.length || activities.length || toggles.length || exploration.length || downtime.length) {
     tabs.push({
       id: "combat",
       icon: "fa-solid fa-hand-fist",
       label: t("TabCombat"),
       sections: [
-        { title: t("Strikes"), rows: strikes },
-        ...(activities.length ? [{ title: t("TabActions"), rows: activities }] : [])
+        ...(toggles.length ? [{ title: t("Toggles"), rows: toggles }] : []),
+        ...(strikes.length ? [{ title: t("Strikes"), rows: strikes }] : []),
+        ...(activities.length ? [{ title: t("TabActions"), rows: activities }] : []),
+        ...(exploration.length ? [{ title: t("Exploration"), rows: exploration }] : []),
+        ...(downtime.length ? [{ title: t("Downtime"), rows: downtime }] : [])
       ]
     });
   }
