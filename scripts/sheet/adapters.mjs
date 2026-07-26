@@ -49,7 +49,12 @@ import * as generic from "./adapters/generic.mjs";
  */
 const ADAPTERS = new Map([
   ["dnd5e", { model: dnd5e.model, types: dnd5e.types }],
-  ["pf2e", { model: pf2e.model, types: pf2e.types }]
+  ["pf2e", { model: pf2e.model, types: pf2e.types }],
+  // Starfinder 2e is a fork of Pathfinder 2e that kept the data model whole —
+  // it never even renamed the namespaces, still reading CONFIG.PF2E and
+  // game.pf2e — so the PF2e adapter serves it unchanged. Its actor types
+  // (character, npc) are a subset of the ones that adapter declares.
+  ["sf2e", { model: pf2e.model, types: pf2e.types }]
 ]);
 
 /**

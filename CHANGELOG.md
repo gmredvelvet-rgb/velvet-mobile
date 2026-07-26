@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Starfinder 2e uses the Pathfinder 2e sheet.** sf2e is a fork of PF2e that
+  kept the data model whole — it never renamed the namespaces and still reads
+  `CONFIG.PF2E` and `game.pf2e` — so the PF2e adapter serves it unchanged:
+  strikes, ammunition and reloading, spells by rank, carry states and
+  resources, rather than the generic adapter's best guess. Its actor types
+  (`character`, `npc`) are a subset of the ones that adapter already declares.
+
 ## 0.14.0 — Pathfinder 2e, system-agnostic sheets, encounter tracker (2026-07-25)
 
 The mobile sheet no longer requires us to have written an adapter for your

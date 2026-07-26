@@ -56,6 +56,7 @@ The shell, gestures, canvas and chat surfaces are game-system independent. The s
 |---|---|
 | **D&D 5e** | Dedicated adapter — abilities, skills, attacks, inventory, spells by level with slot counts, features. |
 | **Pathfinder 2e** | Dedicated adapter built on PF2e's own `Statistic` API — strikes with MAP variants, ammunition and reloading, spells by rank with real slot totals, carry states, hero points, focus and the dying track. |
+| **Starfinder 2e** | Served by the Pathfinder 2e adapter. sf2e is a fork of PF2e that kept the data model whole, so it gets the same sheet. |
 | **Everything else** | Generic adapter. Discovers hit points, a defence value, and ability- and skill-like blocks *by data shape*, and groups items by their declared type. When it finds nothing worth drawing, the system's own sheet is pinned fullscreen instead. |
 
 Systems can be taught directly: `game.modules.get("velvet-mobile").api.sheet.registerAdapter(systemId, { model, types })` replaces the built-in adapter for that system.
