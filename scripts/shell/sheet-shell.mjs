@@ -130,6 +130,9 @@ export class SheetShell {
   /** @type {{parent: HTMLElement, next: Node|null}|null} Original tracker placement. */
   #combatHome = null;
 
+  /** @type {boolean} Guards a second tap while the tracker is still rendering. */
+  #combatOpening = false;
+
   /** @type {BottomSheet|null} */
   #chatSheet = null;
 
@@ -1073,8 +1076,24 @@ export class SheetShell {
    * real thing means initiative, turn order and every system's tracker
    * additions behave exactly as they do on the desktop.
    */
-  openCombat() {
-    if (this.#combatSheet || !this.#active) return;
+  async openCombat() {
+    if (this.#combatSheet || this.#combatOpening || !this.#active) return;
+
+    // The sidebar builds the tab the user is looking at, and combat is almost
+    // never it: the element can exist while its turn list has never been
+    // rendered, which is how the panel came up empty. Render it where it
+    // still lives — an already-rendered application refreshes in place —
+    // and only then borrow it, so what we host arrives populated.
+    this.#combatOpening = true;
+    try {
+      await ui.combat?.render({ force: true });
+    } catch (err) {
+      Logger.debug("Could not refresh the encounter tracker before hosting", err);
+    } finally {
+      this.#combatOpening = false;
+    }
+    if (this.#combatSheet || !this.#active) return; // dismissed while rendering
+
     const tracker = SheetShell.#combatElement();
     if (!tracker) return void Logger.warn("Encounter tracker element not found");
 
@@ -1090,6 +1109,12 @@ export class SheetShell {
     this.#combatSheet.body.append(tracker);
     tracker.classList.add("vm-combat-hosted");
     this.#stack?.querySelector('[data-action="combat"]')?.classList.add("vm-selected");
+    // An empty panel is indistinguishable from a broken one on a phone, so
+    // say which it was: no encounter is a fine reason to have nothing to show.
+    if (!tracker.childElementCount) {
+      Logger.warn(`Encounter tracker hosted but empty (<${tracker.tagName.toLowerCase()} id="${tracker.id}">)`
+        + " — no active encounter, or the sidebar never built it.");
+    }
   }
 
   closeCombat() {

@@ -2,7 +2,7 @@
   "id": "velvet-mobile",
   "title": "Velvet Mobile",
   "description": "Swipe-style sheet-only mobile experience for Foundry VTT: on phones and tablets the client becomes a mobile app around your character sheet — avatar carousel, fullscreen sheet drawer, movement joystick, floating dice and chat — with Foundry's interface out of the way, and zero impact on desktop.",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "compatibility": {
     "minimum": "13",
     "verified": "13",

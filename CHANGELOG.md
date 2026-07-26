@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14.2 — Encounter tracker actually shows the encounter (2026-07-25)
+
+### Fixed
+- **The encounter tracker panel opened empty.** Foundry's sidebar only builds
+  the tab the user is looking at, and combat is almost never it, so the
+  element existed while its turn list had never been rendered — the shell
+  borrowed a shell. The tracker is now rendered where it still lives before
+  being moved (an already-rendered application refreshes in place), so what
+  the panel hosts arrives populated. A second tap while it renders no longer
+  opens a duplicate panel, and a tracker that is still empty after all that
+  now says so in the console, distinguishing "no active encounter" from
+  "something broke".
+
 ## 0.14.1 — Starfinder 2e (2026-07-25)
 
 ### Added
