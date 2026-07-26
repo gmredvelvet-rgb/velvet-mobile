@@ -15,7 +15,7 @@
 | Requirement | Detail |
 |---|---|
 | Foundry VTT | **v13** minimum (verified). v14-ready by audit — see [Compatibility](#compatibility). |
-| Subscription | An **active, qualifying Patreon** subscription to [The GM Studio](https://www.patreon.com/TheGMStudio), for as long as you use the module — see [Licensing](#licensing). Only the **GM** authorises; players never see a prompt. |
+| Subscription | An **active, qualifying Patreon** subscription to [GM RedVelvet](https://www.patreon.com/gmredvelvet), for as long as you use the module — see [Licensing](#licensing). Only the **GM** authorises; players never see a prompt. |
 | Internet | Required while playing. The licence is verified periodically against a licence server. |
 | Device | A touch device (phone/tablet) for the mobile experience. Desktop is used for testing via *Force Phone/Tablet*. |
 
@@ -143,7 +143,7 @@ Use the **auth-code** flow in *Manage licence* — connect on any device, copy t
 ## Support
 
 - **Bugs / feature requests:** [GitHub Issues](https://github.com/gmredvelvet-rgb/velvet-mobile/issues)
-- **Patreon:** [The GM Studio](https://www.patreon.com/TheGMStudio)
+- **Patreon:** [GM RedVelvet](https://www.patreon.com/gmredvelvet)
 - **Discord:** `gmredvelvet`
 - **Email:** gmredvelvet@gmail.com
 
@@ -176,6 +176,6 @@ The tag is the single source of truth for the version — a release can never sh
 
 ## License
 
-**Proprietary.** © 2024–2026 GM RedVelvet / The GM Studio. All rights reserved. Use requires an active qualifying Patreon subscription. See [LICENSE](LICENSE) for full terms.
+**Proprietary.** © 2024–2026 GM RedVelvet / GM RedVelvet. All rights reserved. Use requires an active qualifying Patreon subscription. See [LICENSE](LICENSE) for full terms.
 
 *Velvet Mobile is not affiliated with, endorsed by, or supported by Foundry Gaming LLC.*
