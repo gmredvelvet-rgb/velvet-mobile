@@ -1,12 +1,16 @@
-# Opciones de combate de PF2e (toggles) — implementado y retirado
+# Opciones de combate, exploración y downtime de PF2e / SF2e
 
-**Estado:** implementado el 2026-07-25, **revertido el mismo día**.
-**Punto de retorno:** el módulo quedó tal y como estaba justo después del
-arreglo de munición y recarga, que sí funcionaba.
+**Estado:** aplicado el 2026-07-26 sobre `main` (0.16.0).
+**Punto de retorno:** etiqueta `v0.16.0`.
 
-Este documento guarda todo lo necesario para volver a aplicarlo sin repetir
-la investigación. El código está verificado contra **PF2e 7.12.2** leyendo su
-fuente, no de memoria.
+Un primer intento se aplicó el 2026-07-25 y se revirtió el mismo día porque la
+hoja móvil dejó de mostrarse. La investigación de entonces **no señaló a este
+código** (ver «Por qué se retiró la vez anterior» al final). Esta segunda
+aplicación repite el código verificado, endurece dos puntos que sí eran
+frágiles, y añade exploración y downtime.
+
+Todo está contrastado leyendo la fuente de **PF2e 7.12.2** y **SF2e 0.0.11**,
+no de memoria.
 
 ---
 
@@ -21,11 +25,15 @@ No son una lista fija de acciones: son **rule elements de tipo `RollOption`**.
 Por eso cualquier dote u objeto que añada uno nuevo aparece solo, sin tocar
 código.
 
+Además, las actividades de **exploración** y las acciones de **downtime**
+estaban repartidas entre *Acciones* y *Rasgos* según tuvieran o no coste, y
+no había forma de activar una actividad de exploración desde el móvil.
+
 ---
 
 ## El API de PF2e (verificado en 7.12.2)
 
-### Lectura
+### Toggles — lectura
 
 `actor.synthetics.toggles` → `{ dominio: { opción: toggle } }`
 
@@ -48,7 +56,7 @@ Cada `toggle` tiene esta forma (construida en `RollOptionRuleElement#setOptionAn
 Filtrar por `placement === "actions"`: los demás pertenecen a otra parte de
 la hoja.
 
-### Escritura
+### Toggles — escritura
 
 ```js
 async toggleRollOption(domain, option, itemId = null, value, suboption = null)
@@ -56,140 +64,84 @@ async toggleRollOption(domain, option, itemId = null, value, suboption = null)
 
 Internamente hace `item.update({ "system.rules": … })` (o
 `actor.updateEmbeddedDocuments("Item", …)` para reglas *mergeable*), así que
-**dispara el hook `updateItem`**. El shell ya escucha ese hook y llama a
-`msheet.refresh()`, por lo que la hoja se actualiza sola: no hizo falta tocar
-nada de `sheet-shell.mjs`.
+**dispara el hook `updateItem`**. El shell ya escucha ese hook
+(`sheet-shell.mjs`) y llama a `msheet.refresh()`, por lo que la hoja se
+actualiza sola.
+
+Si no encuentra la regla devuelve `null` — no lanza.
+
+### Exploración
+
+`actor.system.exploration` es una lista plana de ids de ítem. El manejador
+`toggle-exploration` del sistema:
+
+```js
+const exploration = this.actor.system.exploration.filter((id) => this.actor.items.has(id));
+exploration.findSplice((id) => id === actionId) || exploration.push(actionId);
+await this.actor.update({ "system.exploration": exploration });
+```
+
+Es decir: **descarta ids huérfanos antes de escribir**. `explorationIds()`
+hace exactamente lo mismo. La escritura dispara `updateActor`, que el shell
+también escucha.
+
+### Reparto en tres paneles
+
+El sistema clasifica en `#prepareAbilities` así:
+
+```js
+if (!item.isOfType("action") && !(item.isOfType("feat") && item.actionCost) || item.suppressed) continue;
+const traits = item.system.traits.value;
+if (traits.includes("exploration"))      → exploration.active / .other
+else if (traits.includes("downtime"))    → downtime
+else                                     → encounter[actionCost.type ?? "free"]
+```
+
+`actionPanel()` replica esa criba. La única diferencia deliberada: en
+*encounter* seguimos exigiendo coste de acción, para que las capacidades
+pasivas se queden donde siempre han estado, en la pestaña de Rasgos.
+Exploración y downtime sí lo cogen todo, porque la mayoría no cuesta nada.
 
 ### Referencia de la hoja de escritorio
 
-`systems/pf2e/templates/actors/character/partials/strike.hbs` y el manejador
-`ul[data-option-toggles]` del sheet. El módulo `pf2e-velvet-sheet` del propio
-autor ya usaba este mismo patrón (`_prepareToggles`), y se contrastó con la
+- `systems/pf2e/templates/actors/partials/toggles.hbs`
+- `systems/pf2e/templates/actors/character/tabs/actions.hbs`
+- `systems/pf2e/templates/actors/partials/action.hbs` (botón `toggle-exploration`)
+
+El módulo `pf2e-velvet-sheet` del propio autor ya usaba este patrón
+(`_prepareToggles`, `_prepareExplorationActivities`), y se contrastó con la
 fuente del sistema antes de portarlo.
 
 ---
 
-## Código retirado
+## Starfinder 2e
 
-Iba en `scripts/sheet/adapters/pf2e.mjs`, justo antes de la sección
-`/* -- Ammunition -- */`.
+`sf2e` **es un sistema aparte** con su propio `game.system.id`, y ya estaba
+registrado contra el adaptador de PF2e en `sheet/adapters.mjs` desde la
+**0.14.1**. No hizo falta tocar nada: hereda todo lo de este documento por
+usar el mismo adaptador.
 
-```js
-/* -- Roll-option toggles --------------------------------------------------- */
+Lo que sí se verificó aquí, leyendo `systems/sf2e/sf2e.mjs` (0.0.11), es que
+las tres APIs nuevas existen también allí: conserva `game.pf2e` (265 usos),
+`CONFIG.PF2E` (700 usos), `toggleRollOption`, `system.exploration` y el mismo
+manejador `toggle-exploration` carácter por carácter. Sus tipos de actor son
+`character` y `npc` — no tiene `familiar`, lo cual es inofensivo.
 
-/**
- * One toggle row: the checkbox (or dropdown) PF2e draws above its strikes.
- * @param {Actor} actor
- * @param {object} toggle  An entry of `actor.synthetics.toggles[domain]`.
- * @returns {object}
- */
-function toggleRow(actor, toggle) {
-  const label = maybeLocalize(toggle.label, text(toggle.label, toggle.option));
-  const suboptions = (toggle.suboptions ?? []).map((sub) => ({
-    value: sub.value,
-    label: maybeLocalize(sub.label, text(sub.label, sub.value)),
-    selected: sub.selected === true
-  }));
-  const selected = suboptions.find((sub) => sub.selected) ?? suboptions[0] ?? null;
-  const alwaysActive = toggle.alwaysActive === true;
-  const checked = toggle.checked === true || alwaysActive;
+---
 
-  const set = (value, suboption) => safe(() =>
-    actor.toggleRollOption(toggle.domain, toggle.option, toggle.itemId ?? null, value, suboption ?? null));
+## Dónde vive el código
 
-  // A single suboption is fixed — the desktop disables its dropdown too.
-  const pick = suboptions.length > 1
-    ? safe(async () => {
-      const picked = await foundry.applications.api.DialogV2.wait({
-        window: { title: label },
-        position: { width: 320 },
-        content: `<p style="margin: 0 0 .5rem;">${foundry.utils.escapeHTML(t("ToggleHint"))}</p>`,
-        buttons: suboptions.slice(0, 8).map((sub, i) => ({
-          action: `opt${i}`,
-          label: sub.label,
-          default: sub.selected,
-          callback: () => sub.value
-        })),
-        rejectClose: false
-      });
-      if (picked) await set(checked, picked)();
-    })
-    : undefined;
+| Qué | Dónde |
+|---|---|
+| `toggleRow`, `toggleRows` | `scripts/sheet/adapters/pf2e.mjs`, sección *Roll-option toggles* |
+| `actionPanel`, `displayTraits`, `explorationIds`, `toggleExploration`, `explorationRows` | misma sección siguiente, *Encounter / exploration / downtime* |
+| Reparto en un solo pase y secciones de la pestaña | `model()` |
+| Claves de idioma | `VELVETMOBILE.Sheet` en `lang/en.json` y `lang/es.json` |
 
-  /* An always-active toggle is a dropdown with no checkbox, so tapping it
-     picks the option; everything else flips, with the option one tap aside. */
-  let onTap;
-  if (alwaysActive) onTap = pick;
-  else if (toggle.enabled !== false || checked) onTap = set(!checked, selected?.value);
+`scripts/sheet/adapters.mjs` **no se toca**: `sf2e` ya estaba registrado ahí.
 
-  return {
-    id: `${toggle.domain}:${toggle.option}`,
-    label,
-    sub: suboptions.length ? (selected?.label ?? "") : "",
-    badge: !alwaysActive && checked ? "✓" : "",
-    prof: alwaysActive ? undefined : checked,
-    onTap,
-    onLong: alwaysActive ? undefined : pick,
-    actions: pick ? [{ icon: "fa-solid fa-list-ul", label: t("ToggleOption"), onTap: pick }] : []
-  };
-}
-
-/**
- * The options PF2e's own Actions tab shows above the strikes — Current Form,
- * Double Slice, Hunt Prey, One Shot One Kill…
- *
- * They are `RollOption` rule elements, which the system collects into
- * `actor.synthetics.toggles` as `{ domain: { option: toggle } }`, and writes
- * back through `actor.toggleRollOption()`. Only the ones placed in the
- * actions area are ours; the rest belong next to a specific statistic.
- * @param {Actor} actor
- * @returns {object[]}
- */
-function toggleRows(actor) {
-  const domains = actor.synthetics?.toggles ?? {};
-  return Object.values(domains)
-    .flatMap((domain) => Object.values(domain ?? {}))
-    .filter((toggle) => toggle && (toggle.placement ?? "actions") === "actions")
-    .map((toggle) => toggleRow(actor, toggle));
-}
-```
-
-### Conexión en `model()`
-
-Antes del bloque de *strikes*:
-
-```js
-  /* Toggles that belong in the actions area, above the strikes. */
-  const toggles = attempt("toggles", () => toggleRows(actor), []);
-```
-
-Y en la pestaña de combate (condición ampliada + sección al principio, igual
-que en el escritorio):
-
-```js
-  if (strikes.length || activities.length || toggles.length) {
-    tabs.push({
-      id: "combat",
-      icon: "fa-solid fa-hand-fist",
-      label: t("TabCombat"),
-      sections: [
-        ...(toggles.length ? [{ title: t("Toggles"), rows: toggles }] : []),
-        { title: t("Strikes"), rows: strikes },
-        ...(activities.length ? [{ title: t("TabActions"), rows: activities }] : [])
-      ]
-    });
-  }
-```
-
-### Claves de idioma
-
-Van en `VELVETMOBILE.Sheet` de `lang/en.json` y `lang/es.json`:
-
-| Clave | EN | ES |
-|---|---|---|
-| `Toggles` | Combat Options | Opciones de combate |
-| `ToggleHint` | Choose which option applies. | Elige qué opción se aplica. |
-| `ToggleOption` | Choose option | Elegir opción |
+Claves añadidas: `Toggles`, `ToggleHint`, `ToggleOption`, `Exploration`,
+`ExplorationActive`, `Downtime`, `SendToChat`.
 
 ---
 
@@ -204,26 +156,80 @@ Van en `VELVETMOBILE.Sheet` de `lang/en.json` y `lang/es.json`:
   de porte y el de munición. No se añadió ningún componente nuevo.
 - Con una sola suboption no hay nada que elegir: el escritorio también
   desactiva su desplegable en ese caso.
+- **Exploración**: el toque activa/desactiva (es el gesto principal en el
+  escritorio) y un botón de chat conserva el envío de la tarjeta, que es lo
+  que hace el toque en el resto de la hoja. Las activas suben arriba, igual
+  que el grupo *Active* que separa el escritorio.
+- **Nada de CSS nuevo.** Todo se dibuja con las filas, badges y puntos de
+  estado que la hoja ya tenía. Cero riesgo de romper el layout.
+- **Nada de pestañas nuevas.** Las cinco pestañas siguen siendo cinco; las
+  secciones nuevas van dentro de Combate, en el mismo orden que el escritorio:
+  Opciones → Ataques → Acciones → Exploración → Downtime.
 
 ---
 
-## Por qué se retiró — y qué NO fue la causa
+## Verificación
+
+`node` con un stub mínimo de los globales de Foundry, ejecutando el grafo
+real (`adapters.mjs` → `modelFor` → adaptador de PF2e). **52 comprobaciones,
+todas en verde.** Cubren:
+
+1. Personaje completo: orden de secciones, filtrado por `placement`, badges,
+   sub-línea del desplegable, botón de opción, y que nada se duplique en Rasgos.
+2. Que el toque de un toggle llame a `toggleRollOption` con la firma exacta
+   del sistema `(domain, option, itemId, value, suboption)`.
+3. Que el toque de exploración escriba `system.exploration` igual que el
+   sistema, **incluido el descarte de ids huérfanos**.
+4. Regresión: un personaje sin toggles produce exactamente la hoja de antes.
+5. Formas hostiles (15 casos): sin `synthetics`, `toggles` vacío, dominio
+   nulo, `toggles` como array, toggle nulo, toggle vacío, `suboptions: null`,
+   suboption con referencia circular, label que es clave i18n, toggle
+   deshabilitado, `exploration` nulo / string / objeto, traits como `Set`,
+   ítem sin nombre, y un getter de `synthetics` que lanza.
+6. Que `sf2e` use el adaptador de PF2e y no el genérico.
+7. Que el getter deprecado de velocidad ya no se toque, y que aun así siga
+   funcionando el camino antiguo.
+8. Orden completo con strikes reales, y que **D&D 5e no se vea afectado**.
+
+Lo que el harness **no** puede cubrir, y hay que mirar en el mundo real:
+el renderizado en pantalla, los gestos, y el refresco vía hooks.
+
+---
+
+## Cómo volver atrás
+
+Todo esto vive en un único commit sobre `main`. Para deshacerlo sin reescribir
+historia publicada:
+
+```powershell
+git -C "i:\Foundry_Data\Data\modules\velvet-mobile" revert <sha-del-commit>
+```
+
+Para volver el árbol de trabajo a la release anterior y ya está:
+
+```powershell
+git -C "i:\Foundry_Data\Data\modules\velvet-mobile" checkout v0.16.0
+```
+
+En ambos casos hace falta **recarga forzada** en el navegador: Chrome cachea
+los `.mjs` con ganas y ha confundido el diagnóstico más de una vez.
+
+---
+
+## Por qué se retiró la vez anterior — y qué NO fue la causa
 
 Tras aplicarlo, la hoja móvil dejó de mostrarse. Se revirtió para recuperar un
 estado bueno conocido, **pero la investigación no señaló a este código**:
 
-- Se ejecutó el grafo completo (`adapters.mjs` → `modelFor` → adaptador) contra
-  10 casos límite: sin `synthetics`, `synthetics` vacío, dominios nulos, toggle
-  deshabilitado, label que es clave i18n, suboptions con referencia circular
-  `rule`, toggle sin label ni option, `suboptions: null`, `toggles` como array,
-  y un getter de `synthetics` que lanza. **Los 10 construyeron el modelo.**
+- Se ejecutó el grafo completo contra 10 casos límite. Los 10 construyeron el
+  modelo. (Ahora son 15, más 37 comprobaciones funcionales.)
 - El log de consola del usuario mostró `Velvet Mobile | shell active`, la
   llamada a `new MobileSheet` pasando de `mobile-sheet.mjs:65` (el modelo se
   construyó con pestañas) y **ningún error ni aviso de Velvet Mobile**.
 - Estructuralmente tampoco puede: las secciones se pintan en un `try` por
-  sección (`mobile-sheet.mjs`) y las filas en otro por fila. Una fila de toggle
-  rota se pierde a sí misma, no a la hoja. Y `toggleRows` va envuelto en
-  `attempt()`, así que ni siquiera puede propagar una excepción.
+  sección (`mobile-sheet.mjs`) y las filas en otro por fila. Una fila rota se
+  pierde a sí misma, no a la hoja. Y cada extractor va envuelto en `attempt()`,
+  así que no puede propagar una excepción.
 
 ### Sospechoso pendiente de descartar
 
@@ -248,9 +254,7 @@ otro módulo los sobreescriba con los del GM significa que:
 
 Además llega **después** de `ready`, lo que encaja con "se veía y dejó de verse".
 
----
-
-## Antes de volver a aplicarlo
+### Si vuelve a pasar
 
 1. Descartar `monks-player-settings`: desactivarlo, reiniciar el mundo y
    recargar el móvil en duro. O excluir `velvet-mobile.*` y `core.noCanvas`
@@ -262,29 +266,4 @@ Además llega **después** de `ready`, lo que encaja con "se veía y dejó de ve
    ```
 3. Reproducir primero en PC con *Forzar teléfono* y F12 abierto: si ahí
    funciona, el problema no está en este código.
-4. Recarga forzada siempre antes de juzgar: Chrome cachea los `.mjs` con
-   ganas y ha confundido el diagnóstico más de una vez.
-
----
-
-## Extra: un arreglo real que se fue con la reversión
-
-En el mismo lote se corrigió una deprecación que **no tiene nada que ver con
-los toggles** y conviene recuperar por separado, en `model()` → chips de
-cabecera:
-
-```js
-// Antes: num() evalúa TODOS sus argumentos, así que tocaba el getter
-// deprecado en cada construcción de la hoja aunque la ruta moderna
-// ya tuviera el valor.
-const walk = num(speeds.land?.value, speeds.land, system.attributes?.speed?.total, system.attributes?.speed?.value);
-
-// Después:
-const walk = num(speeds.land?.value, speeds.land)
-  ?? num(system.attributes?.speed?.total, system.attributes?.speed?.value);
-```
-
-PF2e deprecó `system.attributes.speed` en 7.5.0 y **lo elimina en 8.0.0**.
-Además, con `CONFIG.compatibility.mode` en `FAILURE` lanzaría hoy mismo y los
-chips de cabecera desaparecerían en silencio. Es independiente de los toggles
-y seguro de aplicar por sí solo.
+4. Recarga forzada siempre antes de juzgar.

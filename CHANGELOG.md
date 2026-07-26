@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.17.0 — Pathfinder 2e combat options, exploration and downtime (2026-07-26)
+
+### Added
+- **Combat options.** The checkboxes and dropdowns PF2e draws above its
+  strikes — Current Form, Double Slice Second Attack, Hunt Prey, One Shot One
+  Kill — now head the Combat tab. They were simply unreachable from a phone
+  before, so any combat option gated behind one was unusable in play. They are
+  not a hard-coded list: PF2e builds them from `RollOption` rule elements into
+  `actor.synthetics.toggles`, so any feat, class feature or item that adds one
+  appears on its own with no further work. Only the ones the system places in
+  the actions area are taken; the rest belong beside a specific statistic.
+  A tap flips the checkbox, a toggle carrying a choice of sub-option gets a
+  list button (and a long press) that opens the picker, and an always-active
+  toggle *is* the picker. Writes go through `actor.toggleRollOption()`, so the
+  behaviour is the system's own.
+- **Exploration activities.** Avoid Notice, Search, Follow the Expert and the
+  rest now have their own section, and a tap starts or stops the activity —
+  something the mobile sheet had no way to do at all. It writes
+  `system.exploration` exactly as the desktop's own toggle does, orphaned item
+  ids dropped and all. Active activities sort to the top, mirroring the
+  "Active" group the desktop splits out, and a chat button still posts the
+  card.
+- **Downtime actions** list separately too, so the Combat tab now mirrors the
+  three panels PF2e splits its own Actions tab into: options, strikes,
+  encounter actions, exploration, downtime.
+- Starfinder 2e inherits all of the above: it has shared the Pathfinder 2e
+  adapter since 0.14.1, and its fork of the system keeps `toggleRollOption`,
+  `system.exploration` and the same trait names unchanged.
+
+### Changed
+- Exploration and downtime activities are no longer scattered between the
+  Actions and Features sections depending on whether they happened to cost an
+  action. Items are now bucketed in a single pass that mirrors the system's
+  own classification, so nothing can appear in two places.
+- The Combat tab no longer draws an empty "Strikes" heading for creatures that
+  have none.
+
+### Fixed
+- **PF2e's speed chip touched a deprecated getter on every sheet build.**
+  `num()` evaluates all of its arguments, so passing both the modern
+  `system.movement.speeds` and the legacy `system.attributes.speed` in one call
+  read the deprecated path even when the modern one had already answered. PF2e
+  deprecated it in 7.5.0 and removes it in 8.0.0 — and with
+  `CONFIG.compatibility.mode` set to `FAILURE` it would throw today, silently
+  taking the header chips with it. The legacy path is now only consulted if
+  the modern one comes back empty.
+
 ## 0.16.0 — v14 compatibility audit (2026-07-26)
 
 ### Added
