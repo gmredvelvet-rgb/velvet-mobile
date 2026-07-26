@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`VelvetComponent#scope()`** — a disposable child scope with the same
+  `listen`/`gesture` contract as the component itself, for regions that are
+  rebuilt on every render. Available to API consumers through
+  `api.components.VelvetComponent`.
+
+### Fixed
+- **A blocked Patreon popup left activation stuck forever.** The flow polls the
+  popup to detect a cancelled authorisation, but a *blocked* popup returns
+  `null`, and `popup?.closed` is then `undefined` rather than `true` — so the
+  poll never fired, the promise never settled, and the Connect button stayed
+  disabled on "Opening Patreon…" with no way back to "I have a code". Blocked
+  popups are most common on exactly the phones this module is for. A null
+  window now ends the flow immediately.
+- **Roll prompts stopped auto-closing after any stray tap.** The listener that
+  closes an attack prompt once a choice is made was registered `{ once: true }`,
+  so the first click *anywhere* in the window — scrolling the list, tapping a
+  label — consumed it, and the damage prompt that followed was again stacked
+  behind a dead window. The listener now persists and is bound once per element
+  rather than once per render, which also stops it accumulating on AppV2
+  re-renders.
+- **Carousel health bars only appeared on D&D 5e and Pathfinder 2e.** The shell
+  read `system.attributes.hp` directly instead of using the adapters'
+  system-agnostic lookup, so every other system's avatars silently lost their
+  bar. Both now go through the same helper.
+- **The mobile sheet leaked its own DOM while open.** Every HP tick rebuilds the
+  header, tab bar and row list, but their listeners were bound to the
+  component-lifetime `AbortSignal` and their gestures registered in the
+  GestureEngine's element-keyed map — so each rebuild kept the *previous* one
+  alive until the sheet closed. Rebuilt regions now run in a disposable scope
+  (`VelvetComponent#scope()`, also available to API consumers), retired before
+  each render.
+- Scene paths containing a quote or backslash no longer break the home screen's
+  backdrop declaration.
+- Settings writes that are deliberately fire-and-forget (`core.noCanvas`, the
+  managed-noCanvas flag) now handle their own rejection instead of surfacing as
+  unhandled promise rejections.
+- JWT segments are re-padded before decoding rather than relying on `atob()`
+  staying lenient about missing base64 padding.
+- Licence-server messages and echoed auth codes are escaped before reaching the
+  activation dialog's markup.
+- Animating a surface that a concurrent teardown already dropped resolves
+  instead of throwing.
+
+### Changed
+- **Manifest declares v14 verified and no longer sets a maximum.** `maximum: 14`
+  hard-blocks installation on v15, which is the opposite of forward
+  compatibility; Foundry's own unverified-version warning is the right mechanism
+  for an untested major.
+- Dice buttons honour the UI Scale setting, which promises larger touch targets
+  and was being ignored by the most-tapped controls in play. The bar's radius
+  scales with them so it stays a pill.
+- `#notifications` is excluded explicitly from the mobile window-sizing rules —
+  it is the only channel left to report errors on a phone.
+
 ## 0.15.0 — Encounter tracker rail (2026-07-26)
 
 ### Changed — the encounter tracker is drawn, not borrowed

@@ -124,10 +124,14 @@ export class LicenseUI {
    * @param {string} [error]
    */
   static async #enterCode(card, prefill = "", error = "") {
+    // Both values reach the DOM as markup: `prefill` is an auth code echoed
+    // back from the popup and `error` is a message from the licence server,
+    // so neither is ours to trust with raw HTML.
+    const escape = (value) => foundry.utils.escapeHTML?.(String(value)) ?? String(value);
     const notice = error
-      ? `<p style="color:var(--color-level-error, #d05); margin-bottom:.5rem">${error}</p>`
+      ? `<p style="color:var(--color-level-error, #d05); margin-bottom:.5rem">${escape(error)}</p>`
       : "";
-    const escaped = foundry.utils.escapeHTML?.(prefill) ?? prefill;
+    const escaped = escape(prefill);
 
     const code = await foundry.applications.api.DialogV2.prompt({
       window: { title: `${MODULE_TITLE} — ${L("CodeTitle")}` },

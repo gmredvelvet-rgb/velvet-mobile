@@ -42,6 +42,10 @@ export class Motion {
    * @returns {Promise<void>}
    */
   static async animate(element, keyframes, { duration = DURATION.NORMAL, easing = EASING.STANDARD, fill = "both" } = {}) {
+    // Callers animate surfaces that a concurrent teardown may already have
+    // dropped (a drawer dismissed as the shell disables). Resolving is the
+    // honest outcome — the animation's end state no longer has anywhere to go.
+    if (!element) return;
     if (Motion.reduced) duration = 0;
     const animation = element.animate(keyframes, { duration, easing, fill });
     try {

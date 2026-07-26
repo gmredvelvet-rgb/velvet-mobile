@@ -183,6 +183,11 @@ export class LicenseClient {
       moduleId: LICENSE_MODULE_ID
     });
     const popup = window.open(url, "vnd-patreon-auth", "width=600,height=700,popup=yes");
+    // A blocked popup returns null. Without this the close-poll below would
+    // never fire (`popup?.closed` is undefined, never true), the promise would
+    // never settle, and the card's Connect button would stay disabled forever
+    // — on exactly the platform where popups are blocked most.
+    if (!popup) return false;
 
     return new Promise((resolve, reject) => {
       const expectedOrigin = new URL(API_BASE).origin;
@@ -210,7 +215,7 @@ export class LicenseClient {
       // Popups are blocked or dismissed often on mobile: resolve rather than
       // hang forever so the caller can restore its button.
       interval = setInterval(() => {
-        if (!popup?.closed) return;
+        if (!popup.closed) return;
         clearInterval(interval);
         // The message can still be in flight when the popup closes, so give
         // it a moment before declaring the flow cancelled.
@@ -435,7 +440,11 @@ export class LicenseClient {
   /** @param {string} value  base64url text @returns {Uint8Array} */
   static #decodeBase64Url(value) {
     const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
-    return Uint8Array.from(atob(base64), (c) => c.codePointAt(0));
+    // JWT segments drop their "=" padding. Browsers are lenient about that
+    // today, but atob() is specified to reject a non-multiple-of-4 input, so
+    // restore the padding rather than rely on the leniency lasting.
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    return Uint8Array.from(atob(padded), (c) => c.codePointAt(0));
   }
 
   async #importRsaKey() {

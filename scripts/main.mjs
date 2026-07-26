@@ -110,11 +110,15 @@ class VelvetMobile {
     try {
       const current = game.settings.get("core", "noCanvas");
       const wanted = this.#willActivate() && !Settings.map;
+      // The write is fire-and-forget by design (init must not block on it),
+      // so its rejection is caught here rather than left unhandled.
+      const write = (value) => game.settings.set("core", "noCanvas", value)
+        ?.catch((err) => Logger.warn("Could not write core.noCanvas", err));
       if (wanted && !current) {
-        game.settings.set("core", "noCanvas", true);
+        write(true);
         Settings.managedNoCanvas = true;
       } else if (!wanted && current && Settings.managedNoCanvas) {
-        game.settings.set("core", "noCanvas", false);
+        write(false);
         Settings.managedNoCanvas = false;
       } else {
         return;
