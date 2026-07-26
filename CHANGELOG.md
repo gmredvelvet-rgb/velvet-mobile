@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — joystick movement has weight
+
+### Changed
+- **The joystick moves tokens through `TokenDocument#move()`**, the movement
+  API the core's own arrow keys use, instead of writing `x`/`y` straight onto
+  the document. That write was a database round-trip per square, each one
+  animating and coming to a stop by itself, which is why holding the stick
+  read as a run of separate jumps rather than as walking. Going through the
+  movement API also means walls, terrain and scene bounds are respected, the
+  movement action (walk, fly, swim, crawl) sets the pace, and the step is
+  recorded in movement history the way desktop movement is.
+- **Steps have weight.** A token now lifts, slides and lands on each square,
+  like a piece being moved on a board. The lift runs in its own animation
+  context, so it rides alongside the movement animation rather than competing
+  with it, and its timing follows whatever speed the movement action asks for
+  — a swimming token takes its time. `prefers-reduced-motion` drops the lift
+  and keeps the movement. Set *Joystick movement* to **Direct** for the old
+  behaviour.
+
+### Added
+- **Footstep sounds**, one per square, alternating between two configurable
+  files so a walk is not one sample on repeat. Only the moving player hears
+  them. Velvet Mobile ships no audio of its own — audio is licensed
+  separately from code — so both settings start empty and silent; point them
+  at files in your own world.
+
+### Fixed
+- **Diagonal and hexagonal movement were wrong.** The old code added
+  `dx * gridSize` to the raw coordinates and only re-snapped square grids, so
+  on hexagonal scenes the joystick walked tokens off the grid entirely. Steps
+  are now resolved through the scene grid's own `getShiftedPoint`, which
+  handles all four hex orientations and refuses illegal diagonals. Verified
+  against Foundry's own shift implementation across 240 combinations of grid
+  type, starting position and direction.
+- A token that had drifted off-grid now steps back onto it instead of
+  skipping a square, matching the core's keyboard movement.
+
 ## 0.17.0 — Pathfinder 2e combat options, exploration and downtime (2026-07-26)
 
 ### Added

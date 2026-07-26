@@ -28,6 +28,24 @@
         "Name": "Ocultar chat automáticamente (segundos)",
         "Hint": "Segundos hasta que un panel de chat abierto automáticamente se oculta solo. 0 lo deja abierto. Tocar el panel cancela el temporizador."
       },
+      "MoveStyle": {
+        "Name": "Movimiento del joystick",
+        "Hint": "Cómo se mueve el token cuando lo desplazas con el joystick.",
+        "Weighted": "Con peso — el token se eleva, se desliza y aterriza",
+        "Direct": "Directo — recto a la casilla siguiente"
+      },
+      "StepSound": {
+        "Name": "Sonido de pisada",
+        "Hint": "Suena una vez por casilla movida con el joystick. Velvet Mobile no incluye audio propio: apunta esto a un archivo de tu mundo. Déjalo vacío para el silencio. Solo lo oyes tú."
+      },
+      "StepSoundAlt": {
+        "Name": "Sonido de pisada (el otro pie)",
+        "Hint": "Segundo sonido opcional, alternado con el primero para que caminar no sea una misma muestra repetida."
+      },
+      "StepVolume": {
+        "Name": "Volumen de las pisadas",
+        "Hint": "Volumen de los sonidos de pisada. 0 los silencia."
+      },
       "Debug": {
         "Name": "Modo depuración",
         "Hint": "Activa el registro detallado en consola para diagnóstico."

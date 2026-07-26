@@ -23,9 +23,31 @@ export const SETTINGS = Object.freeze({
   UI_SCALE: "uiScale",
   CHAT_ON_MESSAGE: "chatOnMessage",
   CHAT_AUTO_HIDE: "chatAutoHide",
+  MOVE_STYLE: "moveStyle",
+  STEP_SOUND: "stepSound",
+  STEP_SOUND_ALT: "stepSoundAlt",
+  STEP_VOLUME: "stepVolume",
   MANAGED_NOCANVAS: "managedNoCanvas",
   DEBUG: "debug"
 });
+
+/** Values for the `moveStyle` setting — how a joystick step is animated. */
+export const MOVE_STYLES = Object.freeze({
+  /** Lift, slide, land: each tile is a deliberate move, like a chess piece. */
+  WEIGHTED: "weighted",
+  /** Straight to the next tile, with only the core's own movement animation. */
+  DIRECT: "direct"
+});
+
+/** Peak lift of a weighted step, as a fraction of the token's own size. */
+export const STEP_LIFT = 0.16;
+
+/** Share of a step spent rising; the remainder is the landing. */
+export const STEP_RISE_SHARE = 0.45;
+
+/** Bounds (ms) for the lift/land pair, so a step reads at any movement speed. */
+export const STEP_LIFT_MIN_MS = 90;
+export const STEP_LIFT_MAX_MS = 260;
 
 /** Values for the `chatOnMessage` setting. */
 export const CHAT_MODES = Object.freeze({

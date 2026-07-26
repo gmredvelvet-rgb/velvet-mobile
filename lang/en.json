@@ -28,6 +28,24 @@
         "Name": "Auto-hide chat (seconds)",
         "Hint": "Seconds until an auto-opened chat panel hides itself. 0 keeps it open. Touching the panel cancels the timer."
       },
+      "MoveStyle": {
+        "Name": "Joystick movement",
+        "Hint": "How a token moves when you step it with the joystick.",
+        "Weighted": "Weighted — the token lifts, slides and lands",
+        "Direct": "Direct — straight to the next square"
+      },
+      "StepSound": {
+        "Name": "Footstep sound",
+        "Hint": "Played once per square moved with the joystick. Velvet Mobile ships no audio of its own — point this at a file in your world. Leave empty for silence. Only you hear it."
+      },
+      "StepSoundAlt": {
+        "Name": "Footstep sound (other foot)",
+        "Hint": "Optional second sound, alternated with the first so a walk does not become one sample on repeat."
+      },
+      "StepVolume": {
+        "Name": "Footstep volume",
+        "Hint": "Volume of the footstep sounds. 0 silences them."
+      },
       "Debug": {
         "Name": "Debug Mode",
         "Hint": "Enable verbose console logging for troubleshooting."

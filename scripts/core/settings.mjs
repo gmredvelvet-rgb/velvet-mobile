@@ -4,7 +4,7 @@
  * @module core/settings
  */
 
-import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES } from "./constants.mjs";
+import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES } from "./constants.mjs";
 import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
 
@@ -99,6 +99,52 @@ export class Settings {
       default: 8
     });
 
+    game.settings.register(MODULE_ID, SETTINGS.MOVE_STYLE, {
+      name: localize("MoveStyle.Name"),
+      hint: localize("MoveStyle.Hint"),
+      scope: "client",
+      config: true,
+      type: String,
+      choices: {
+        [MOVE_STYLES.WEIGHTED]: localize("MoveStyle.Weighted"),
+        [MOVE_STYLES.DIRECT]: localize("MoveStyle.Direct")
+      },
+      default: MOVE_STYLES.WEIGHTED
+    });
+
+    /* Footstep audio ships with no sound of its own: audio is licensed
+       separately from code, so the files are the user's to choose. Empty
+       means silent, which is also the safe default in a shared game. */
+    game.settings.register(MODULE_ID, SETTINGS.STEP_SOUND, {
+      name: localize("StepSound.Name"),
+      hint: localize("StepSound.Hint"),
+      scope: "client",
+      config: true,
+      type: String,
+      default: "",
+      filePicker: "audio"
+    });
+
+    game.settings.register(MODULE_ID, SETTINGS.STEP_SOUND_ALT, {
+      name: localize("StepSoundAlt.Name"),
+      hint: localize("StepSoundAlt.Hint"),
+      scope: "client",
+      config: true,
+      type: String,
+      default: "",
+      filePicker: "audio"
+    });
+
+    game.settings.register(MODULE_ID, SETTINGS.STEP_VOLUME, {
+      name: localize("StepVolume.Name"),
+      hint: localize("StepVolume.Hint"),
+      scope: "client",
+      config: true,
+      type: Number,
+      range: { min: 0, max: 1, step: 0.05 },
+      default: 0.6
+    });
+
     // Internal: remembers that WE set core.noCanvas, so turning the module
     // off restores the user's own choice instead of clobbering it.
     game.settings.register(MODULE_ID, SETTINGS.MANAGED_NOCANVAS, {
@@ -147,6 +193,24 @@ export class Settings {
   /** @returns {number} Seconds before an auto-opened chat panel hides (0 = never). */
   static get chatAutoHide() {
     return game.settings.get(MODULE_ID, SETTINGS.CHAT_AUTO_HIDE);
+  }
+
+  /** @returns {string} One of MOVE_STYLES. */
+  static get moveStyle() {
+    return game.settings.get(MODULE_ID, SETTINGS.MOVE_STYLE);
+  }
+
+  /** @returns {string[]} Footstep sounds to cycle through; empty when silent. */
+  static get stepSounds() {
+    return [
+      game.settings.get(MODULE_ID, SETTINGS.STEP_SOUND),
+      game.settings.get(MODULE_ID, SETTINGS.STEP_SOUND_ALT)
+    ].filter((src) => typeof src === "string" && src.trim());
+  }
+
+  /** @returns {number} Footstep volume, 0 to 1. */
+  static get stepVolume() {
+    return game.settings.get(MODULE_ID, SETTINGS.STEP_VOLUME);
   }
 
   /** @returns {boolean} Whether this module is the one that enabled core.noCanvas. */

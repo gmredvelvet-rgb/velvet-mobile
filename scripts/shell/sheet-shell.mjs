@@ -28,6 +28,7 @@ import { Settings } from "../core/settings.mjs";
 import { VelvetComponent } from "../components/component.mjs";
 import { BottomSheet } from "../components/bottom-sheet.mjs";
 import { Joystick } from "../components/joystick.mjs";
+import { stepToken, resetFootsteps } from "../canvas/token-mover.mjs";
 import { Motion, DURATION } from "../motion/animation-engine.mjs";
 import { modelFor } from "../sheet/adapters.mjs";
 import { hpOf } from "../sheet/adapters/shared.mjs";
@@ -853,6 +854,8 @@ export class SheetShell {
   /** Show/hide the movement stick (speed-dial "Move" action). */
   #toggleJoystick() {
     if (this.#joystick) return void this.#hideJoystick();
+    // Every walk starts on the same foot, so short hops sound deliberate.
+    resetFootsteps();
     this.#joystick = new Joystick({ onStep: (dx, dy) => this.#moveToken(dx, dy) }).mount();
     this.#stack?.querySelector('[data-action="move"]')?.classList.add("vm-selected");
     // Moving means watching the map: reveal it, own the token, center on
@@ -910,34 +913,22 @@ export class SheetShell {
   }
 
   /**
-   * Step the selected actor's token one grid square. Updates the
-   * TokenDocument directly, so it works with the canvas disabled and
-   * replicates to the GM and every other client — the same net effect as
-   * arrow-key movement on desktop.
+   * Step the selected actor's token one grid square, through the same
+   * movement API the core's own arrow keys use — so it replicates to the GM
+   * and every other client, respects walls and terrain, and records movement
+   * history the way desktop movement does. See canvas/token-mover.mjs for
+   * the grid maths and the step animation.
    * @param {number} dx @param {number} dy  Each in {-1, 0, 1}.
    */
   async #moveToken(dx, dy) {
     const tokenDoc = this.#tokenDoc();
     if (!tokenDoc) return void this.#warnNoToken();
-    const scene = tokenDoc.parent;
-    const size = scene?.grid?.size ?? 100;
-    const type = scene?.grid?.type ?? 1;
-
-    let x = tokenDoc.x + dx * size;
-    let y = tokenDoc.y + dy * size;
-    // Snap square grids so a token that drifted off-grid re-aligns.
-    if (type === 1) {
-      x = Math.round(x / size) * size;
-      y = Math.round(y / size) * size;
-    }
-    x = Math.max(0, x);
-    y = Math.max(0, y);
-    if (x === tokenDoc.x && y === tokenDoc.y) return;
-
     try {
-      await tokenDoc.update({ x, y });
+      // A refused step is not a failure: walls, illegal diagonals and scene
+      // bounds all legitimately answer "no". Only throwing is a problem.
+      const moved = await stepToken(tokenDoc, dx, dy);
       // Keep the camera on the token so the player watches themselves move.
-      this.#panToToken();
+      if (moved) this.#panToToken();
     } catch (err) {
       Logger.error("Token move failed", err);
       this.#warnNoToken();
