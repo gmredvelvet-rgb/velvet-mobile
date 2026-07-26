@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.1 — Starfinder 2e (2026-07-25)
 
 ### Added
 - **Starfinder 2e uses the Pathfinder 2e sheet.** sf2e is a fork of PF2e that
