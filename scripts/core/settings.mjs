@@ -5,6 +5,7 @@
  */
 
 import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES } from "./constants.mjs";
+import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
 
 export class Settings {
@@ -155,7 +156,10 @@ export class Settings {
 
   /** @param {boolean} value */
   static set managedNoCanvas(value) {
-    game.settings.set(MODULE_ID, SETTINGS.MANAGED_NOCANVAS, value);
+    // A setter cannot return the promise, so the rejection has to be handled
+    // here or it surfaces as an unhandled rejection in the console.
+    game.settings.set(MODULE_ID, SETTINGS.MANAGED_NOCANVAS, value)
+      ?.catch((err) => Logger.warn("Could not persist the managed-noCanvas flag", err));
   }
 
   /** @returns {boolean} */

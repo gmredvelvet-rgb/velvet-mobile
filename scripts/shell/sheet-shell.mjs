@@ -30,6 +30,7 @@ import { BottomSheet } from "../components/bottom-sheet.mjs";
 import { Joystick } from "../components/joystick.mjs";
 import { Motion, DURATION } from "../motion/animation-engine.mjs";
 import { modelFor } from "../sheet/adapters.mjs";
+import { hpOf } from "../sheet/adapters/shared.mjs";
 import { MobileSheet } from "../sheet/mobile-sheet.mjs";
 import { ChromeHider } from "./chrome-hider.mjs";
 
@@ -247,14 +248,23 @@ export class SheetShell {
       + " button[data-action='normal'], button[data-action='critical']";
     if (!root?.querySelector?.(choices)) return;
 
+    // AppV2 re-renders in place and keeps its root element, so the hook fires
+    // again on the same node — bind once per element rather than once per
+    // render. (AppV1 builds a fresh element, which correctly rebinds.)
+    if (root.dataset.vmAutoclose) return;
+    root.dataset.vmAutoclose = "1";
+
+    // Deliberately not `{ once: true }`: that spent the listener on the first
+    // click anywhere in the prompt — scrolling the list, tapping a label —
+    // leaving the window unable to close itself once a choice was finally made.
     root.addEventListener("click", (event) => {
-      if (!event.target.closest("button")) return;
+      if (!event.target.closest?.("button")) return;
       setTimeout(() => {
         try {
           app.close?.();
         } catch { /* already gone */ }
       }, 200);
-    }, { once: true });
+    });
   }
 
   disable() {
@@ -576,7 +586,11 @@ export class SheetShell {
     if (!bg) return;
     const scene = game.scenes?.current ?? game.scenes?.active;
     const src = scene?.background?.src;
-    bg.style.backgroundImage = src ? `url("${src}")` : "";
+    // File paths are user-supplied and may legitimately contain quotes or
+    // backslashes, which would terminate the CSS string early and break the
+    // declaration (or, on a crafted path, smuggle another one in).
+    const escaped = src ? src.replaceAll("\\", "\\\\").replaceAll('"', '\\"') : "";
+    bg.style.backgroundImage = escaped ? `url("${escaped}")` : "";
   }
 
   /* -- Avatar carousel ------------------------------------------------------------ */
@@ -666,11 +680,16 @@ export class SheetShell {
     fill.classList.toggle("vm-low", hp > 25 && hp <= 50);
   }
 
-  /** @param {Actor} actor @returns {number|null} HP percentage, when the system exposes it. */
+  /**
+   * @param {Actor} actor
+   * @returns {number|null} HP percentage, when the system exposes it.
+   *
+   * Delegates to the adapters' system-agnostic lookup instead of hardcoding
+   * `system.attributes.hp`: that path is a dnd5e/pf2e convention, so every
+   * other system's carousel avatars silently lost their health bar.
+   */
   static #hpOf(actor) {
-    const hp = actor?.system?.attributes?.hp;
-    if (!hp || !(hp.max > 0)) return null;
-    return Math.max(0, Math.min(100, Math.round(((hp.value ?? 0) / hp.max) * 100)));
+    return hpOf(actor)?.pct ?? null;
   }
 
   /** rAF-throttled proximity pass over the carousel avatars. */

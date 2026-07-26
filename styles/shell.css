@@ -568,7 +568,8 @@
     flex-direction: column;
     padding: var(--vm-space-2) 0;
     border: 2px solid rgb(255 255 255 / 0.15);
-    border-radius: 23px;
+    /* Half the (scaled) die-button width, so the bar stays a pill at any scale. */
+    border-radius: calc(23px * var(--vm-scale));
     background: color-mix(in srgb, var(--vm-surface) 88%, transparent);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
@@ -588,10 +589,12 @@
     }
   }
 
+  /* Scale-aware like every other control: the UI Scale setting promises
+     "larger touch targets", and these are among the most-tapped in play. */
   .vm-die-btn {
     position: relative;
-    width: 46px;
-    height: 40px;
+    width: calc(46px * var(--vm-scale));
+    height: calc(40px * var(--vm-scale));
     display: grid;
     place-items: center;
     border: none;
@@ -746,7 +749,10 @@
    * the focused window itself, and overriding that flattens every window to
    * one level, which is what left the damage prompt stuck behind the attack
    * prompt. Our own surfaces stay below 100 so these always win. */
-  html[data-vm-sheet-only] .application:not(.vm-pinned),
+  /* #notifications is excluded explicitly: it is the only channel left to
+   * report errors on a phone, and it must never be re-boxed as a window if a
+   * future release starts framing it as a regular application. */
+  html[data-vm-sheet-only] .application:not(.vm-pinned):not(#notifications),
   html[data-vm-sheet-only] .app.window-app:not(.vm-pinned) {
     /* Centred with inset + auto margins rather than a translate: Foundry
      * positions windows with inline left/top, and a layered `translate`

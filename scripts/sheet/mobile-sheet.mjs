@@ -52,6 +52,18 @@ export class MobileSheet extends VelvetComponent {
   #refreshTimer = null;
 
   /**
+   * Listener/gesture scopes for the two parts that get rebuilt.
+   * Without them every HP tick would leave the previous header, tab bar and
+   * row subtree registered — and therefore alive — for as long as the sheet
+   * stayed open.
+   * @type {{listen: Function, gesture: Function, dispose: () => void}|null}
+   */
+  #chromeScope = null;
+
+  /** @type {{listen: Function, gesture: Function, dispose: () => void}|null} */
+  #contentScope = null;
+
+  /**
    * @param {object} options
    * @param {Actor} options.actor
    * @param {(actor: Actor) => object|null} options.buildModel
@@ -108,6 +120,7 @@ export class MobileSheet extends VelvetComponent {
       if (!this.#model.tabs.some((tab) => tab.id === this.#tabId)) {
         this.#tabId = this.#model.tabs[0]?.id ?? "";
       }
+      this.#resetChromeScope();
       this.element.querySelector(".vm-ms-header")?.replaceWith(this.#buildHeader());
       this.element.querySelector(".vm-ms-tabs")?.replaceWith(this.#buildTabBar());
       // Keep the reading position: a mid-combat HP tick must not yank the
@@ -128,9 +141,22 @@ export class MobileSheet extends VelvetComponent {
 
   /* -- Build -------------------------------------------------------------- */
 
+  /** Retire the previous header/tab-bar scope and open a fresh one. */
+  #resetChromeScope() {
+    this.#chromeScope?.dispose();
+    this.#chromeScope = this.scope();
+  }
+
+  /** Retire the previous tab-content scope and open a fresh one. */
+  #resetContentScope() {
+    this.#contentScope?.dispose();
+    this.#contentScope = this.scope();
+  }
+
   /** @override @returns {HTMLElement} */
   build() {
     const el = VelvetComponent.el;
+    this.#resetChromeScope();
     const root = el("section", {
       cls: "vm-msheet",
       attrs: { role: "dialog", "aria-label": this.actor.name },
@@ -181,7 +207,7 @@ export class MobileSheet extends VelvetComponent {
           el("span", { cls: "vm-ms-stat-label", text: stat.label })
         ]
       });
-      if (stat.onTap) this.listen(chip, "click", () => stat.onTap());
+      if (stat.onTap) this.#chromeScope.listen(chip, "click", () => stat.onTap());
       return chip;
     });
 
@@ -233,7 +259,7 @@ export class MobileSheet extends VelvetComponent {
         el("span", { cls: "vm-ms-hp-text", text: `${hp.value} / ${hp.max}${temp}` })
       ]
     });
-    this.listen(bar, "click", () => this.#promptHp());
+    this.#chromeScope.listen(bar, "click", () => this.#promptHp());
     return bar;
   }
 
@@ -272,7 +298,7 @@ export class MobileSheet extends VelvetComponent {
         attrs: { type: "button", "data-tab": tab.id, "aria-label": tab.label },
         children: [VelvetComponent.icon(tab.icon), el("span", { text: tab.label })]
       });
-      this.listen(btn, "click", () => this.#selectTab(tab.id));
+      this.#chromeScope.listen(btn, "click", () => this.#selectTab(tab.id));
       bar.append(btn);
     }
     return bar;
@@ -298,6 +324,7 @@ export class MobileSheet extends VelvetComponent {
     const body = this.element?.querySelector(".vm-ms-body");
     const tab = this.#model.tabs.find((entry) => entry.id === tabId);
     if (!body || !tab) return;
+    this.#resetContentScope();
     body.replaceChildren();
     body.scrollTop = 0;
     for (const section of tab.sections ?? []) {
@@ -323,12 +350,12 @@ export class MobileSheet extends VelvetComponent {
           el("span", { cls: "vm-ms-ability-mod", text: ability.mod })
         ]
       });
-      if (ability.onTap) this.listen(cell, "click", () => ability.onTap());
+      if (ability.onTap) this.#contentScope.listen(cell, "click", () => ability.onTap());
       if (ability.onLong) {
-        this.gesture(cell, "longpress", (g) => {
+        this.#contentScope.gesture(cell, "longpress", (g) => {
           if (g.phase === "ended") ability.onLong();
         });
-        this.listen(cell, "contextmenu", (e) => {
+        this.#contentScope.listen(cell, "contextmenu", (e) => {
           e.preventDefault();
           ability.onLong();
         });
@@ -386,14 +413,14 @@ export class MobileSheet extends VelvetComponent {
         row.badge ? el("span", { cls: "vm-ms-row-badge", text: row.badge }) : ""
       ].filter(Boolean)
     });
-    if (row.onTap) this.listen(main, "click", () => row.onTap());
+    if (row.onTap) this.#contentScope.listen(main, "click", () => row.onTap());
     // Secondary action: long press, or right-click for anyone testing on a
     // desktop with mobile mode forced on.
     if (row.onLong) {
-      this.gesture(main, "longpress", (g) => {
+      this.#contentScope.gesture(main, "longpress", (g) => {
         if (g.phase === "ended") row.onLong();
       });
-      this.listen(main, "contextmenu", (e) => {
+      this.#contentScope.listen(main, "contextmenu", (e) => {
         e.preventDefault();
         row.onLong();
       });
@@ -405,7 +432,7 @@ export class MobileSheet extends VelvetComponent {
         attrs: { type: "button", "aria-label": action.label, "data-tooltip": action.label },
         children: [VelvetComponent.icon(action.icon)]
       });
-      this.listen(btn, "click", (e) => {
+      this.#contentScope.listen(btn, "click", (e) => {
         e.stopPropagation();
         action.onTap();
       });
@@ -421,7 +448,7 @@ export class MobileSheet extends VelvetComponent {
         attrs: { type: "button", "aria-label": "info" },
         children: [VelvetComponent.icon("fa-solid fa-circle-info")]
       });
-      this.listen(detailBtn, "click", async (e) => {
+      this.#contentScope.listen(detailBtn, "click", async (e) => {
         e.stopPropagation();
         if (detail.hidden) {
           if (!detail.dataset.loaded) {
