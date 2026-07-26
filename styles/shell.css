@@ -822,6 +822,48 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Encounter tracker hosted inside the bottom sheet
+   *
+   * Same borrowing trick as the chat: Foundry's real tracker is moved in.
+   * The display override matters because a sidebar tab that is not the
+   * active one arrives hidden, and it must show once it is ours.
+   * ------------------------------------------------------------------ */
+
+  .vm-combat-panel .vm-sheet-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vm-sheet-body .vm-combat-hosted {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+
+  /* The turn list scrolls; the encounter controls stay put above it. */
+  .vm-sheet-body .vm-combat-hosted .combat-tracker,
+  .vm-sheet-body .vm-combat-hosted #combat-tracker,
+  .vm-sheet-body .vm-combat-hosted .directory-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Turn rows are desktop-sized; give thumbs something to actually hit. */
+  .vm-sheet-body .vm-combat-hosted .combatant {
+    min-height: var(--vm-touch-target);
+  }
+
+  .vm-sheet-body .vm-combat-hosted input {
+    font-size: max(var(--vm-font-min), 1em);
+  }
+
+  /* ------------------------------------------------------------------ *
    * Target picker
    * ------------------------------------------------------------------ */
 

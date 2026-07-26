@@ -387,6 +387,17 @@ export class MobileSheet extends VelvetComponent {
       ].filter(Boolean)
     });
     if (row.onTap) this.listen(main, "click", () => row.onTap());
+    // Secondary action: long press, or right-click for anyone testing on a
+    // desktop with mobile mode forced on.
+    if (row.onLong) {
+      this.gesture(main, "longpress", (g) => {
+        if (g.phase === "ended") row.onLong();
+      });
+      this.listen(main, "contextmenu", (e) => {
+        e.preventDefault();
+        row.onLong();
+      });
+    }
 
     const trailing = (row.actions ?? []).map((action) => {
       const btn = el("button", {

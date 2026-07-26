@@ -51,10 +51,21 @@ const HEARTBEAT_MS = 15 * 60 * 1000;
 const FIRST_HEARTBEAT_MS = 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000;
 
-/** @param {string} key @param {object} [data] */
-const L = (key, data) => (data
-  ? game.i18n.format(`${L10N}.License.${key}`, data)
-  : game.i18n.localize(`${L10N}.License.${key}`));
+/**
+ * Localize a `VELVETMOBILE.License.*` key, interpolating `data` when given.
+ *
+ * v14 merged `format` into `localize(key, data)` and removed `format`; v13
+ * only interpolates through `format` and ignores a second argument to
+ * `localize`. Neither call works on both, so ask the core which one it has.
+ * @param {string} key @param {object} [data]
+ */
+const L = (key, data) => {
+  const id = `${L10N}.License.${key}`;
+  if (!data) return game.i18n.localize(id);
+  return typeof game.i18n.format === "function"
+    ? game.i18n.format(id, data)
+    : game.i18n.localize(id, data);
+};
 
 export class LicenseError extends Error {
   /** @param {string} message @param {string} code */

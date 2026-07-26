@@ -48,7 +48,17 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
 | v13 | ✅ **Verified** — developed and tested against v13. |
 | v14 | 🟡 **Ready by audit** — the code was audited against the released v14 API and no longer depends on the internals most likely to move (see [CHANGELOG](CHANGELOG.md) 0.13.0). Not yet run on a live v14 world, so `compatibility.verified` remains `13`. |
 
-**System-agnostic where possible.** The sheet layer targets the Velvet sheets; the shell, gestures, canvas and chat surfaces are game-system independent.
+### Game systems
+
+The shell, gestures, canvas and chat surfaces are game-system independent. The sheet layer works in three tiers:
+
+| System | Sheet |
+|---|---|
+| **D&D 5e** | Dedicated adapter — abilities, skills, attacks, inventory, spells by level with slot counts, features. |
+| **Pathfinder 2e** | Dedicated adapter built on PF2e's own `Statistic` API — strikes with MAP variants, ammunition and reloading, spells by rank with real slot totals, carry states, hero points, focus and the dying track. |
+| **Everything else** | Generic adapter. Discovers hit points, a defence value, and ability- and skill-like blocks *by data shape*, and groups items by their declared type. When it finds nothing worth drawing, the system's own sheet is pinned fullscreen instead. |
+
+Systems can be taught directly: `game.modules.get("velvet-mobile").api.sheet.registerAdapter(systemId, { model, types })` replaces the built-in adapter for that system.
 
 ## Licensing
 
@@ -121,7 +131,8 @@ Use the **auth-code** flow in *Manage licence* — connect on any device, copy t
 ## Known issues
 
 - `compatibility.verified` is `13`: v14 support is audited but not yet run against a live v14 world.
-- The mobile experience targets the Velvet sheets for the sheet layer; other systems fall back to Foundry's default sheet inside the drawer.
+- Systems without a dedicated adapter get the generic one, which reads the actor by data shape. It covers most systems, but a hand-written adapter always reads better — [register your own](#game-systems) if yours deserves one.
+- Pathfinder 2e does not yet expose the roll-option toggles the desktop sheet shows above its strikes (Current Form, Double Slice, Hunt Prey…), exploration activities, or the effects panel. Planned for a future release.
 
 ## Developer setup
 
