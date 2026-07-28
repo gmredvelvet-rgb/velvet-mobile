@@ -70,6 +70,8 @@
       "Locked": "Licence server unreachable. The module is locked until it reconnects.",
       "CodeTitle": "Enter auth code",
       "CodeHint": "Paste the code shown after connecting your Patreon account.",
+      "MigrationTitle": "Why am I being asked to reconnect?",
+      "MigrationBody": "We changed how Patreon subscriptions are verified, so activations made before the change no longer validate. Reconnecting your account once puts it right. This is not a new charge and not a price change: your Patreon subscription is untouched, you will not be billed again, and you keep your installation slots. Only the authorisation is renewed.",
       "Activate": "Activate",
       "StatusActive": "Licence active — {tier} subscriber.",
       "StatusInactive": "No active licence in this world.",
