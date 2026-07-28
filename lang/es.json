@@ -70,6 +70,8 @@
       "Locked": "No se puede contactar con el servidor de licencias. El módulo queda bloqueado hasta reconectar.",
       "CodeTitle": "Introducir código",
       "CodeHint": "Pega el código que aparece tras conectar tu cuenta de Patreon.",
+      "MigrationTitle": "¿Por qué tengo que volver a conectar?",
+      "MigrationBody": "Hemos cambiado la forma de verificar las suscripciones de Patreon, así que las activaciones hechas antes del cambio dejan de validarse. Volver a conectar la cuenta una sola vez lo soluciona. No es un cobro nuevo ni un cambio de precio: tu suscripción de Patreon sigue intacta, no se te vuelve a cobrar y conservas tus instalaciones. Solo se renueva la autorización.",
       "Activate": "Activar",
       "StatusActive": "Licencia activa — suscriptor {tier}.",
       "StatusInactive": "Sin licencia activa en este mundo.",

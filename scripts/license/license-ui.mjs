@@ -58,6 +58,7 @@ export class LicenseUI {
       </header>
       <p class="vm-license-status">${licensed ? L("StatusActive", { tier: client.tier }) : L("Intro")}</p>
       <p class="vm-license-note">${licensed ? L("ReleaseHint") : L("GmOnly")}</p>
+      ${licensed ? "" : LicenseUI.migrationNotice()}
       <button type="button" data-action="connect" class="vm-license-primary">
         <i class="fa-brands fa-patreon" aria-hidden="true"></i> ${L("Connect")}
       </button>
@@ -117,6 +118,23 @@ export class LicenseUI {
   }
 
   /**
+   * Transitional notice for patrons whose earlier activation stopped
+   * validating. Being asked to re-authorise out of the blue reads as a scam,
+   * so it states what changed and — just as important — what did not: same
+   * subscription, no new charge, same slots. Drop it once the migration has
+   * settled.
+   * @returns {string}
+   */
+  static migrationNotice() {
+    return `
+      <div style="margin-bottom:.6rem;padding:.5rem .6rem;border-radius:4px;
+                  border:1px solid rgba(200,155,60,.35);background:rgba(200,155,60,.08);
+                  font-size:.9em;line-height:1.45">
+        <strong>${L("MigrationTitle")}</strong><br/>${L("MigrationBody")}
+      </div>`;
+  }
+
+  /**
    * Manual code entry: the fallback for blocked popups and the retry path
    * for a rejected exchange.
    * @param {HTMLElement} card
@@ -136,6 +154,7 @@ export class LicenseUI {
     const code = await foundry.applications.api.DialogV2.prompt({
       window: { title: `${MODULE_TITLE} — ${L("CodeTitle")}` },
       content: `${notice}
+        ${LicenseUI.migrationNotice()}
         <p style="margin-bottom:.5rem">${L("CodeHint")}</p>
         <input type="text" name="code" autocomplete="off" spellcheck="false" value="${escaped}"
                style="width:100%;font-family:monospace;font-size:16px">`,
