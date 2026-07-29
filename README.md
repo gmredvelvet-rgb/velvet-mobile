@@ -1,6 +1,6 @@
 # Velvet Mobile
 
-**Swipe-style, sheet-only mobile experience for Foundry VTT.** On a phone or tablet, Foundry's interface and canvas step aside and the client becomes a mobile app around your character sheet — modelled on the UX of Swipe VTT's sheets-only mode, but built for the Velvet sheets. Desktop clients are untouched.
+**Sheet-only mobile experience for Foundry VTT.** On a phone or tablet, Foundry's interface and canvas step aside and the client becomes a mobile app around your character sheet, built for the Velvet sheets. Desktop clients are untouched.
 
 [![Foundry v13](https://img.shields.io/badge/Foundry-v13-informational)](https://foundryvtt.com/)
 [![Foundry v14 ready](https://img.shields.io/badge/Foundry-v14%20ready-informational)](https://foundryvtt.com/)
@@ -38,7 +38,14 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
   - 🎲 **dice roller** — tap dice to build a pool (2d6 + 1d20…), then Roll;
   - 💬 **chat** — Foundry's real chat log in a bottom sheet (messages, rolls and input all work), with an unread dot;
   - ⚔️ **encounter tracker** — turn order as a slim rail down the right edge: portraits with initiative, the active turn ringed and lit, defeated greyed out, round at the top. Tap anyone to centre the camera on them. Updates live as turns advance.
-  - ⚙️ **settings** — the escape hatch.
+  - ⚙️ **settings** — a settings screen built for a phone, not Foundry's two-column dialog: packages, then their settings, with a search box across the lot. Switches, sliders, pickers and a file browser; submenus open normally; world settings are badged and still respect Foundry's permissions.
+- **Conditions as chips** — apply and clear conditions with a tap, at the top of the *Combat* tab. The ones in effect sort first and the rest fold behind a *+N*; conditions that carry a value (frightened 2, clumsy 1) get a −/+ stepper. PF2e routes through its own condition items; every other system uses Foundry's status effects.
+- **Long press any row for its actions** — send to chat *without spending the item*, open its sheet to edit, prepare/unprepare a 5e spell, change a PF2e carry state. The mobile stand-in for the desktop's right-click menu.
+- **Effects** — what is running on you and how much longer it lasts, counted in the unit the effect was written in. Counter effects get −/+ steppers, everything gets *End effect*, expired ones are dimmed rather than hidden, and the countdown updates as the clock advances. PF2e counter effects get −/+ steppers; 5e effects switch on and off. Only temporary effects are listed — passive feature plumbing stays out of the way.
+- **Rests** — short and long rest (Take a Breather and Rest for the Night on PF2e), at the top of the *Stats* tab. Each opens the system's own rest flow.
+- **Spell preparation** (D&D 5e) — the list shows every spell you *know*; a bookmark on each row toggles the ones you prepared today, and what you did not prepare is dimmed. A *Preparation* section shows the daily allowance per class (*Wizard · 3 / 5*).
+- **Hit points done properly** — a *Temp HP* chip in the header row (tap to set or clear), a striped band on the bar showing the shield riding on top of real hit points, damage spent through it before real hit points, and a changed maximum respected and spelled out.
+- **Plays well with Dice Tray** — if you have it installed, our dice button steps aside rather than duplicating its bar.
 - **Chat auto-open** — incoming rolls (or all messages, per setting) open the chat at half height; it hides itself after a few seconds unless you touch it.
 - **No canvas at all** — mobile clients run with Foundry's `core.noCanvas`, so the game canvas is never created: a large memory and battery win (reverted automatically if you turn mobile mode off).
 - Dialogs and item sheets still float on top, clamped to the screen. Keyboard-aware layout, notch/safe-area support, no accidental zoom or pull-to-refresh.
@@ -56,10 +63,10 @@ The shell, gestures, canvas and chat surfaces are game-system independent. The s
 
 | System | Sheet |
 |---|---|
-| **D&D 5e** | Dedicated adapter — abilities, skills, attacks, inventory, spells by level with slot counts, features. |
-| **Pathfinder 2e** | Dedicated adapter built on PF2e's own `Statistic` API — strikes with MAP variants, ammunition and reloading, spells by rank with real slot totals, carry states, hero points, focus and the dying track. |
+| **D&D 5e** | Dedicated adapter — abilities, skills, attacks, inventory, spells by level with slot counts and per-class preparation, rests, conditions, temporary effects, features. |
+| **Pathfinder 2e** | Dedicated adapter built on PF2e's own `Statistic` API — strikes with MAP variants, ammunition and reloading, spells by rank with real slot totals, carry states, hero points, focus, the dying track, conditions with their values, and an effects list with live durations. |
 | **Starfinder 2e** | Served by the Pathfinder 2e adapter. sf2e is a fork of PF2e that kept the data model whole, so it gets the same sheet. |
-| **Everything else** | Generic adapter. Discovers hit points, a defence value, and ability- and skill-like blocks *by data shape*, and groups items by their declared type. When it finds nothing worth drawing, the system's own sheet is pinned fullscreen instead. |
+| **Everything else** | Generic adapter. Discovers hit points, a defence value, and ability- and skill-like blocks *by data shape*, groups items by their declared type, and offers the system's status effects as condition chips. When it finds nothing worth drawing, the system's own sheet is pinned fullscreen instead. |
 
 Systems can be taught directly: `game.modules.get("velvet-mobile").api.sheet.registerAdapter(systemId, { model, types })` replaces the built-in adapter for that system.
 

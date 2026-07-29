@@ -1,5 +1,5 @@
 /**
- * Velvet Mobile — Swipe-style sheet-only shell.
+ * Velvet Mobile — sheet-only shell.
  *
  * When active (html[data-vm-sheet-only]) Foundry disappears: interface
  * chrome and canvas hide (notifications stay) and the client becomes a
@@ -162,7 +162,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Home screen: scene artwork + vignette (Swipe's no-canvas backdrop)
+   * Home screen: scene artwork + vignette (the no-canvas backdrop)
    * ------------------------------------------------------------------ */
 
   .vm-home {
@@ -1207,6 +1207,318 @@
 
   .vm-empty-card p {
     margin: 0;
+    color: var(--vm-text-dim);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Settings screen
+   *
+   * Foundry's own dialog is two columns; a phone has room for one. This is
+   * a fullscreen drawer: package list, then that package's settings, with a
+   * search box that cuts across both.
+   * ------------------------------------------------------------------ */
+
+  .vm-settings {
+    position: fixed;
+    inset: 0;
+    z-index: 60; /* above the sheet drawer and the chat panel */
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgb(28 26 34) 0%, rgb(18 17 22) 30%);
+    color: var(--vm-text);
+    padding-top: var(--vm-safe-top);
+    will-change: transform;
+    overscroll-behavior: contain;
+  }
+
+  .vm-set-handle {
+    flex: 0 0 auto;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    touch-action: none;
+  }
+
+  .vm-set-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 0.35);
+  }
+
+  .vm-set-header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--vm-space-2);
+    padding: 0 var(--vm-space-3) var(--vm-space-2);
+    border-bottom: 1px solid var(--vm-surface-border);
+  }
+
+  .vm-set-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-height: var(--vm-touch-target);
+  }
+
+  .vm-set-title {
+    flex: 1;
+    margin: 0;
+    border: none;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .vm-set-back,
+  .vm-set-close {
+    display: grid;
+    place-items: center;
+    width: var(--vm-touch-target);
+    height: var(--vm-touch-target);
+    border: none;
+    background: none;
+    color: var(--vm-text);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-set-back[hidden] {
+    display: none;
+  }
+
+  .vm-set-search {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--vm-space-3);
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-md);
+    background: rgb(255 255 255 / 0.06);
+    color: var(--vm-text);
+    /* 16px or iOS zooms the whole page on focus. */
+    font-size: 16px;
+  }
+
+  .vm-set-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: var(--vm-space-2) var(--vm-space-3) calc(var(--vm-safe-bottom) + var(--vm-space-6));
+  }
+
+  /* Package list */
+  .vm-set-cat {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    width: 100%;
+    min-height: var(--vm-touch-target);
+    padding: var(--vm-space-2) 0;
+    border: none;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    background: none;
+    color: var(--vm-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-set-cat:active {
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  .vm-set-cat-label {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+
+  .vm-set-cat-count {
+    padding: 1px 8px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 999px;
+    background: var(--vm-surface-raised);
+    font-size: 0.72rem;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-set-group {
+    position: sticky;
+    top: calc(-1 * var(--vm-space-2));
+    z-index: 2;
+    margin: var(--vm-space-3) 0 var(--vm-space-2);
+    padding: var(--vm-space-1) 0;
+    border: none;
+    background: rgb(19 18 23 / 0.95);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--vm-text-dim);
+  }
+
+  /* One setting */
+  .vm-set-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    padding: var(--vm-space-3) 0;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  /* Controls that need the width get their own line under the label. */
+  .vm-set-row.vm-set-slider,
+  .vm-set-row.vm-set-text,
+  .vm-set-row.vm-set-file,
+  .vm-set-row.vm-set-select {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vm-set-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .vm-set-label {
+    font-size: 0.92rem;
+  }
+
+  .vm-set-hint {
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--vm-text-dim);
+  }
+
+  .vm-set-scope {
+    align-self: flex-start;
+    margin-top: var(--vm-space-1);
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgb(176 106 179 / 0.22);
+    border: 1px solid var(--vm-accent);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--vm-text);
+  }
+
+  .vm-set-note {
+    font-size: 0.76rem;
+    font-style: italic;
+    color: var(--vm-text-dim);
+  }
+
+  /* Toggle */
+  .vm-set-toggle {
+    flex: 0 0 auto;
+    position: relative;
+    width: 48px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.08);
+    transition: background var(--vm-anim-fast) var(--vm-ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-set-toggle.vm-on {
+    background: var(--vm-accent);
+    border-color: var(--vm-accent);
+  }
+
+  .vm-set-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgb(245 245 250);
+    transition: transform var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-set-toggle.vm-on .vm-set-knob {
+    transform: translateX(20px);
+  }
+
+  /* Inputs */
+  .vm-set-select,
+  .vm-set-input {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--vm-space-2);
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: rgb(255 255 255 / 0.06);
+    color: var(--vm-text);
+    font-size: 16px;
+  }
+
+  .vm-set-file {
+    display: flex;
+    gap: var(--vm-space-2);
+    align-items: center;
+  }
+
+  .vm-set-browse {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: var(--vm-surface-raised);
+    color: var(--vm-text);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-set-slider {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+  }
+
+  .vm-set-range {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--vm-accent);
+    height: var(--vm-touch-target);
+  }
+
+  .vm-set-readout {
+    flex: 0 0 auto;
+    min-width: 3ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+  }
+
+  .vm-set-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vm-space-2);
+    min-height: var(--vm-touch-target);
+    padding: 0 var(--vm-space-4);
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: var(--vm-surface-raised);
+    color: var(--vm-text);
+    font-size: 0.85rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-set-menu-btn:active {
+    border-color: var(--vm-accent);
+  }
+
+  .vm-set-empty {
+    margin: var(--vm-space-6) 0;
+    text-align: center;
     color: var(--vm-text-dim);
   }
 }

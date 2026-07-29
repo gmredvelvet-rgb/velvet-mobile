@@ -14,21 +14,30 @@
  * View model shape:
  *   {
  *     subtitle: string,
- *     hp: { value, max, temp, pct } | null,
+ *     hp: { value, max, temp, bonus, pct, tempPct } | null,  // max is effective
  *     ac: number|string|null,
  *     stats: [{ label, value, onTap? }],
- *     applyHp: (delta) => Promise,
+ *     applyHp: (delta) => Promise,            // damage spends temp HP first
+ *     applyTempHp: ((value) => Promise)|null, // null where unsupported
  *     tabs: [{
  *       id, icon, label,
  *       sections: [{
  *         title?, badge?,
- *         type?: "abilities",              // grid of ability cells
+ *         type?: "abilities" | "conditions",
  *         abilities?: [{ key, label, mod, onTap?, onLong? }],
+ *         conditions?: [{                  // type: "conditions" — chip cloud
+ *           id, label, img?, active, value?,
+ *           onTap,                         // toggle on/off
+ *           onIncrease?, onDecrease?       // valued conditions, shown while on
+ *         }],
  *         rows?: [{
  *           id, img?, label, sub?, badge?, prof?,
+ *           dim?,                          // present but not active today
  *           onTap?,                        // roll / use
- *           onLong?,                       // secondary action (long press)
- *           actions?: [{ icon, label, onTap }],
+ *           onLong?,                       // one specific secondary action
+ *           menu?: [{ id, icon, label, onTap }],  // long-press action menu;
+ *                                          // takes precedence over onLong
+ *           actions?: [{ icon, label, onTap, active? }],  // active? = toggle
  *           description?: () => Promise<string>
  *         }]
  *       }]
@@ -91,7 +100,9 @@ export function registeredSystems() {
  * adapter can emit a full tab bar whose sections are all empty (a familiar
  * with no skills, an actor whose getters all threw). A sheet of empty lists
  * is strictly worse than the system's own, so it has to actually contain
- * at least one row or ability cell.
+ * at least one row or ability cell. Condition chips deliberately do not
+ * count: any actor can be offered the system's status effects, so a sheet
+ * of nothing but conditions would always pass and never be worth showing.
  * @param {object|null} model
  * @returns {boolean}
  */

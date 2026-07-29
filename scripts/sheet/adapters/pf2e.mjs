@@ -12,8 +12,9 @@
  */
 
 import {
-  at, attempt, describe, hpOf, itemTypeLabel, maybeLocalize, makeApplyHp,
-  num, safe, signed, t, text, titleCase
+  at, attempt, conditionsOf, conditionsSection, describe, hpOf, itemMenu, itemTypeLabel,
+  formatDuration, maybeLocalize, makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, signed,
+  sortConditions, t, text, titleCase
 } from "./shared.mjs";
 import { Logger } from "../../core/logger.mjs";
 
@@ -480,6 +481,151 @@ function explorationRows(actor, items) {
     }));
 }
 
+/* -- Conditions ------------------------------------------------------------ */
+
+/**
+ * PF2e conditions are Items, not core ActiveEffects, and many of them carry
+ * a value — frightened 2, clumsy 1, dying 3. Core's `toggleStatusEffect`
+ * only knows on/off, so the chips route through PF2e's own condition API
+ * instead and expose a stepper for the valued ones.
+ *
+ * Persistent damage is excluded: it needs a damage type and formula, which is
+ * a dialog rather than a toggle, and PF2e leaves it out of its own list too.
+ *
+ * @param {Actor} actor
+ * @returns {object[]} Chips, or the generic ones if PF2e's API is missing.
+ */
+function pf2eConditions(actor) {
+  const catalogue = game.pf2e?.ConditionManager?.conditions;
+  if (!actor?.isOwner || !catalogue || typeof actor.toggleCondition !== "function") {
+    return conditionsOf(actor);
+  }
+
+  /* Applied conditions, by slug. PF2e stores each as an owned item, so the
+     value we want to show lives on the item rather than in the catalogue. */
+  const applied = new Map();
+  for (const condition of actor.conditions?.active ?? []) {
+    if (condition?.slug) applied.set(condition.slug, condition);
+  }
+
+  const chips = [];
+  for (const [slug, condition] of catalogue.entries()) {
+    if (slug === "persistent-damage") continue;
+    const on = applied.get(slug);
+    const valued = condition?.system?.value?.isValued === true;
+    const chip = {
+      id: slug,
+      // The catalogue name first, deliberately: an applied PF2e condition
+      // folds its value into its name ("Frightened 2"), which would read
+      // twice next to the value badge.
+      label: text(condition?.name, on?.name) || titleCase(slug),
+      img: text(condition?.img, on?.img),
+      active: Boolean(on),
+      value: valued ? num(on?.value) : null,
+      onTap: safe(() => actor.toggleCondition(slug))
+    };
+    if (on && valued) {
+      chip.onIncrease = safe(() => actor.increaseCondition(slug));
+      // `forceRemove: false` steps down to zero and then off, which is what a
+      // player tapping "−" on a frightened 1 expects.
+      chip.onDecrease = safe(() => actor.decreaseCondition(slug, { forceRemove: false }));
+    }
+    chips.push(chip);
+  }
+  return sortConditions(chips);
+}
+
+/* -- Effects --------------------------------------------------------------- */
+
+/**
+ * How much longer an effect lasts.
+ *
+ * Counted in the unit the effect was written in, not the largest that
+ * divides evenly: ten rounds of Bless is "10 rds" to a player counting
+ * turns, and calling it "1 min" is technically true and useless. Only when
+ * the declared unit has run down below one — half an hour left on an
+ * hour-long buff — does it drop to the next unit down.
+ *
+ * Falls back to the declared duration when PF2e cannot compute a remaining
+ * time (no start recorded, an unsupported unit).
+ *
+ * @param {Item} effect
+ * @returns {string}
+ */
+function durationLabel(effect) {
+  const duration = effect?.system?.duration ?? {};
+  const unit = text(duration.unit);
+  if (unit === "unlimited") return t("DurationUnlimited");
+  if (unit === "encounter") return t("DurationEncounter");
+
+  const remaining = num(effect?.remainingDuration?.remaining);
+  if (remaining === null || !Number.isFinite(remaining)) {
+    const value = num(duration.value);
+    return value === null || !unit ? "" : `${value} ${titleCase(unit)}`;
+  }
+  return formatDuration(remaining, { from: unit });
+}
+
+/**
+ * The effects currently on a creature — spell durations, buffs, afflictions —
+ * with the controls PF2e's own effects panel offers.
+ *
+ * Separate from conditions on purpose: a condition is a rules state you turn
+ * on and off, an effect is something running with a clock on it, and the
+ * thing you need to see about an effect is how much longer it lasts.
+ *
+ * @param {Actor} actor
+ * @returns {object[]}
+ */
+function effectRows(actor) {
+  const effects = actor.itemTypes?.effect ?? [];
+  return effects.map((effect) => {
+    const badge = effect.badge ?? effect.system?.badge ?? null;
+    const counter = badge?.type === "counter";
+    const editable = actor.isOwner && effect.isOwner !== false;
+
+    const actions = [];
+    if (editable && counter && typeof effect.decrease === "function") {
+      actions.push({
+        icon: "fa-solid fa-minus",
+        label: t("Decrease"),
+        onTap: safe(() => effect.decrease())
+      });
+    }
+    if (editable && counter && typeof effect.increase === "function") {
+      actions.push({
+        icon: "fa-solid fa-plus",
+        label: t("Increase"),
+        onTap: safe(() => effect.increase())
+      });
+    }
+    if (editable) {
+      // Ending an effect is not deleting a possession — it is how effects
+      // finish, and PF2e's own panel removes them on a click too. It gets a
+      // visible button rather than hiding in the long-press menu.
+      actions.push({
+        icon: "fa-solid fa-xmark",
+        label: t("RemoveEffect"),
+        onTap: safe(() => effect.delete())
+      });
+    }
+
+    return {
+      id: effect.id,
+      img: effect.img,
+      label: effect.name,
+      sub: [durationLabel(effect), effect.fromAura ? t("FromAura") : ""].filter(Boolean).join(" · "),
+      badge: text(counter ? String(num(badge?.value) ?? "") : badge?.label),
+      // An expired effect is still listed — PF2e leaves it for you to dismiss
+      // — but it is no longer doing anything, so it should not read as live.
+      dim: effect.isExpired === true,
+      actions,
+      menu: itemMenu(actor, effect),
+      description: describe(effect)
+    };
+  });
+}
+
 /* -- Strikes --------------------------------------------------------------- */
 
 /**
@@ -681,6 +827,32 @@ export function model(actor) {
 
   /* Combat options — the checkboxes the desktop draws above its strikes. */
   const toggles = attempt("toggles", () => toggleRows(actor), []);
+  const conditions = attempt("conditions", () => pf2eConditions(actor), []);
+  const effects = attempt("effects", () => effectRows(actor), []);
+
+  /* Rests. Neither Pathfinder 2e nor Starfinder 2e has a short rest: Rest for
+     the Night is the only one. Take a Breather is deliberately not offered —
+     it belongs to the optional Stamina variant, which is off by default, and
+     `game.pf2e.actions` lists it whether or not the variant is enabled, so
+     its presence in the registry says nothing about whether it applies. */
+  const rests = attempt("rests", () => {
+    const action = (slug) => game.pf2e?.actions?.get?.(slug) ?? game.pf2e?.actions?.[slug];
+    const run = (slug) => safe(async () => {
+      const entry = action(slug);
+      if (typeof entry === "function") return entry({ actors: [actor] });
+      if (typeof entry?.use === "function") return entry.use({ actors: [actor] });
+      throw new Error(t("NotRollable"));
+    });
+    return restRows([
+      {
+        id: "rest-for-the-night",
+        label: t("RestForTheNight"),
+        icon: "icons/svg/sleep.svg",
+        available: Boolean(action("restForTheNight")),
+        onTap: run("restForTheNight")
+      }
+    ]);
+  }, []);
 
   /* The three panels the desktop splits its Actions tab into, bucketed in a
      single pass so no item can ever land in two of them. */
@@ -708,6 +880,7 @@ export function model(actor) {
       sub: displayTraits(item),
       badge: costBadge(item),
       onTap: usePf2eItem(actor, item),
+      menu: itemMenu(actor, item),
       description: describe(item)
     }));
 
@@ -735,12 +908,17 @@ export function model(actor) {
           .filter(Boolean).join(" · "),
         badge: badges.join(" "),
         onTap: usePf2eItem(actor, item),
-        onLong: promptCarry(actor, item),
         actions: typeof actor.changeCarryType === "function" ? [{
           icon: "fa-solid fa-hand",
           label: t("Carry"),
           onTap: promptCarry(actor, item)
         }] : [],
+        menu: itemMenu(actor, item, [typeof actor.changeCarryType === "function" ? {
+          id: "carry",
+          icon: "fa-solid fa-hand",
+          label: t("Carry"),
+          onTap: promptCarry(actor, item)
+        } : null]),
         description: describe(item)
       };
     }), []);
@@ -784,6 +962,7 @@ export function model(actor) {
           .slice(0, 3).map(titleCase).join(" · "),
         badge: costBadge(spell),
         onTap: castSpell(actor, spell),
+        menu: itemMenu(actor, spell),
         description: describe(spell)
       }));
 
@@ -867,13 +1046,14 @@ export function model(actor) {
   /* Tabs — only the ones with something behind them. A familiar with no
      skills must not get a tab bar full of empty lists. */
   const tabs = [];
-  if (abilities.length || resources.length || saves.length || skills.length) {
+  if (abilities.length || resources.length || saves.length || skills.length || rests.length) {
     tabs.push({
       id: "stats",
       icon: "fa-solid fa-user",
       label: t("TabStats"),
       sections: [
         ...(abilities.length ? [{ type: "abilities", abilities }] : []),
+        ...restSection(rests),
         ...(resources.length ? [{ title: t("Resources"), rows: resources }] : []),
         ...(saves.length ? [{ title: t("Saves"), rows: saves }] : []),
         ...(skills.length ? [{ title: t("Skills"), rows: skills }] : [])
@@ -884,12 +1064,15 @@ export function model(actor) {
   /* Combat, in the desktop's own order: options, strikes, then the three
      action panels. Every section is conditional — a creature with nothing
      but exploration activities must not get an empty Strikes list. */
-  if (strikes.length || activities.length || toggles.length || exploration.length || downtime.length) {
+  if (conditions.length || effects.length || strikes.length || activities.length
+    || toggles.length || exploration.length || downtime.length) {
     tabs.push({
       id: "combat",
       icon: "fa-solid fa-hand-fist",
       label: t("TabCombat"),
       sections: [
+        ...conditionsSection(conditions),
+        ...(effects.length ? [{ title: t("Effects"), badge: String(effects.length), rows: effects }] : []),
         ...(toggles.length ? [{ title: t("Toggles"), rows: toggles }] : []),
         ...(strikes.length ? [{ title: t("Strikes"), rows: strikes }] : []),
         ...(activities.length ? [{ title: t("TabActions"), rows: activities }] : []),
@@ -929,6 +1112,7 @@ export function model(actor) {
     hp: hpOf(actor),
     ac: attempt("ac", () => num(at(actor, "attributes.ac.value"), system.attributes?.ac?.value), null),
     applyHp: makeApplyHp(actor),
+    applyTempHp: makeApplyTempHp(actor),
     stats,
     tabs
   };

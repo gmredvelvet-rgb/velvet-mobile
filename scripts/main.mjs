@@ -80,7 +80,7 @@ class VelvetMobile {
     });
     Logger.setDebug(Settings.debug);
     // init runs before Foundry creates the canvas, so this applies to the
-    // current session without a reload (the Swipe approach: on mobile the
+    // current session without a reload (on mobile the
     // canvas never exists at all).
     this.#syncNoCanvas();
   }

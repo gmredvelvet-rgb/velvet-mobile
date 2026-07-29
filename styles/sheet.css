@@ -190,15 +190,57 @@
     background: rgb(190 60 55);
   }
 
+  /* Temporary hit points: a band riding on top of the real ones, because
+     that is the order they are spent in. Striped so it reads as "borrowed"
+     rather than as more of the same bar. */
+  .vm-ms-hp-temp {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      135deg,
+      rgb(120 190 235) 0 6px,
+      rgb(95 165 210) 6px 12px
+    );
+    transition: width var(--vm-anim-normal) var(--vm-ease), left var(--vm-anim-normal) var(--vm-ease);
+  }
+
   .vm-ms-hp-text {
     position: relative;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--vm-space-2);
     height: 100%;
     color: #fff;
     font-size: 0.85rem;
     font-weight: 700;
     text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+  }
+
+  .vm-ms-hp-tempval {
+    color: rgb(190 226 248);
+  }
+
+  /* The Temp HP chip, in the header row. Present at zero so it is a place
+     you can go, lit in the shield's own blue once there is one. */
+  .vm-ms-temp .vm-ms-stat-value {
+    color: var(--vm-text-dim);
+  }
+
+  .vm-ms-temp.vm-on {
+    border-color: rgb(120 190 235);
+    background: rgb(120 190 235 / 0.16);
+  }
+
+  .vm-ms-temp.vm-on .vm-ms-stat-value {
+    color: rgb(190 226 248);
+  }
+
+  .vm-ms-hp-bonus {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.85;
   }
 
   /* ------------------------------------------------------------------ *
@@ -291,6 +333,132 @@
   .vm-ms-ability-mod {
     font-size: 1rem;
     font-weight: 700;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Conditions
+   *
+   * A wrapped cloud of pills rather than a list: forty status effects as
+   * full-width rows would be a tab of its own, and the active ones read
+   * faster side by side than stacked.
+   * ------------------------------------------------------------------ */
+
+  .vm-ms-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vm-space-2);
+    margin-bottom: var(--vm-space-2);
+  }
+
+  .vm-ms-condition {
+    display: inline-flex;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.04);
+  }
+
+  /* `display` on a class beats the UA's `[hidden] { display: none }`, so the
+     collapsed chips need this to actually disappear. */
+  .vm-ms-condition[hidden] {
+    display: none;
+  }
+
+  .vm-ms-condition.vm-on {
+    border-color: var(--vm-accent);
+    background: rgb(176 106 179 / 0.22);
+  }
+
+  .vm-ms-condition-main {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-height: 34px;
+    padding: 0 var(--vm-space-3);
+    border: none;
+    background: none;
+    color: var(--vm-text-dim);
+    font-size: 0.75rem;
+    line-height: 1;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-condition.vm-on .vm-ms-condition-main {
+    color: var(--vm-text);
+    font-weight: 600;
+  }
+
+  .vm-ms-condition-main:active {
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  .vm-ms-condition-img {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    object-fit: cover;
+    /* Off chips read as one flat row of text; the icon only earns its
+       colour once the condition is actually in effect. */
+    filter: grayscale(1);
+    opacity: 0.5;
+  }
+
+  .vm-ms-condition.vm-on .vm-ms-condition-img {
+    filter: none;
+    opacity: 1;
+  }
+
+  .vm-ms-condition-value {
+    min-width: 18px;
+    padding: 2px 5px;
+    border-radius: 999px;
+    background: var(--vm-accent);
+    color: rgb(255 255 255);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .vm-ms-condition-step {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    border: none;
+    border-left: 1px solid var(--vm-surface-border);
+    background: rgb(255 255 255 / 0.06);
+    color: var(--vm-text);
+    font-size: 0.7rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-condition-step:active {
+    background: var(--vm-accent);
+  }
+
+  .vm-ms-condition-more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-height: 34px;
+    padding: 0 var(--vm-space-3);
+    border: 1px dashed var(--vm-surface-border);
+    border-radius: 999px;
+    background: none;
+    color: var(--vm-text-dim);
+    font-size: 0.75rem;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-condition-more .vm-icon {
+    transition: transform var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-ms-condition-more.vm-open .vm-icon {
+    transform: rotate(180deg);
   }
 
   /* Rows */
@@ -396,6 +564,19 @@
 
   .vm-ms-row-action:active {
     color: var(--vm-accent);
+  }
+
+  /* A trailing button that is a toggle rather than a command — the spell
+     preparation bookmark. Lit means on. */
+  .vm-ms-row-action.vm-on {
+    color: var(--vm-accent);
+  }
+
+  /* Known but not prepared, carried but not held: still there, just not
+     part of what you can do right now. The row stays fully tappable — the
+     dimming is information, not a disabled state. */
+  .vm-ms-row.vm-dim .vm-ms-row-main {
+    opacity: 0.55;
   }
 
   .vm-ms-row-detail {

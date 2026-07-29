@@ -30,11 +30,24 @@ export class GestureController {
   /** @type {import("./recognizer.mjs").GestureSession|null} */
   #session = null;
 
-  /** @param {HTMLElement} element */
-  constructor(element) {
+  /** @type {boolean} Stop the pointer stream reaching anything below us. */
+  #suppress = false;
+
+  /**
+   * @param {HTMLElement} element
+   * @param {object} [options]
+   * @param {boolean} [options.capture]   Listen in the capture phase, so the
+   *   element's own descendants never see the pointer first.
+   * @param {boolean} [options.suppress]  Stop propagation on pointerdown.
+   *   Only meaningful with `capture`, and only for elements whose children
+   *   run their own pointer handling we need to win against — the game
+   *   canvas, where PIXI would otherwise start a drag-select under our pan.
+   */
+  constructor(element, { capture = false, suppress = false } = {}) {
     this.#element = element;
+    this.#suppress = suppress;
     this.#abort = new AbortController();
-    element.addEventListener("pointerdown", (e) => this.#onDown(e), { signal: this.#abort.signal });
+    element.addEventListener("pointerdown", (e) => this.#onDown(e), { signal: this.#abort.signal, capture });
   }
 
   /** @returns {boolean} */
@@ -83,6 +96,10 @@ export class GestureController {
 
   /** @param {PointerEvent} e */
   #onDown(e) {
+    // Foundry's canvas runs its own pointer handling on the PIXI view below
+    // the board. Left alone it starts a drag-select under every pan, which is
+    // how a finger meant to move the camera ends up lassoing tokens.
+    if (this.#suppress) e.stopPropagation();
     if (!this.#session) {
       this.#session = { pointers: new Map(), primary: null, maxCount: 0 };
       this.#sessionAbort = new AbortController();

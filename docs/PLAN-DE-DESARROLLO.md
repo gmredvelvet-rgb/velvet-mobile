@@ -15,16 +15,13 @@
 | Foundry VTT | v13 (UI ApplicationV2, CSS `@layer`, temas claro/oscuro, PixiJS 7.x) |
 | Sistema principal | Pathfinder 2e (con Starfinder 2e como secundario) |
 | Ecosistema propio | `pf2e-velvet-sheet` (hoja custom, ESM, sin build step) |
-| Módulo de referencia | `swipe-vtt` v1.22.3 (estudiado solo a nivel de ideas) |
 
-### 1.2 Auditoría del módulo de referencia (swipe-vtt)
+### 1.2 Decisiones arquitectónicas de partida
 
-Se estudió **exclusivamente** la arquitectura conceptual. No se copia código. Se **excluye por completo** todo lo relacionado con Patreon/premium, OAuth, QR-connect, invite URLs y standalone-auth.
-
-**Ideas arquitectónicas valiosas identificadas:**
+**Patrones adoptados para la experiencia móvil:**
 
 1. **Detección multi-señal de dispositivo** — combina `navigator.maxTouchPoints`, `matchMedia("(pointer: coarse)")`, `userAgent`, `devicePixelRatio` y dimensiones de pantalla. Ninguna señal aislada es fiable; la combinación sí.
-2. **Estrategia CSS por clase raíz** — todo el CSS vive bajo `body.swipe-vtt`, garantizando cero impacto cuando el modo móvil está inactivo. *Lección aprendida:* usa 1139 selectores bajo una clase de body, lo que crea guerras de especificidad. Nosotros usaremos **atributos `data-*` en `<html>` + CSS custom properties**, apoyándonos en que en v13 el core vive en `@layer` (los estilos de módulo, sin layer, ganan sin necesidad de especificidad artificial).
+2. **Aislamiento del CSS por raíz** — todo el CSS condicionado a la raíz del documento, garantizando cero impacto cuando el modo móvil está inactivo. Usaremos **atributos `data-*` en `<html>` + CSS custom properties** en lugar de una clase de body con selectores anidados, que degenera en guerras de especificidad; en v13 el core vive en `@layer`, así que los estilos de módulo sin layer ganan sin especificidad artificial.
 3. **Modos de rendimiento escalonados** (Minimal / Balanced / Aggressive / Sheet-Only) con auto-escalado si el FPS cae — excelente patrón de UX de rendimiento.
 4. **Canvas freeze** — pausar el render tras inactividad con triggers de descongelado (combate, movimiento de token, tirada). Gran ahorro de batería.
 5. **Interruptor maestro por cliente** — el módulo puede desactivarse totalmente en un cliente sin desinstalarlo (setting `client`).
@@ -391,7 +388,7 @@ Cada fase produce `docs/FASE-N.md` con: qué se hizo, decisiones, checklist de p
 |---|---|---|---|
 | Cambios de API v13→v14 (AppV2, scene controls) | Alta | Alto | Capa `AppAdapter`; acceso a APIs core centralizado en `core/`; gates por `game.release.generation` |
 | Hojas PF2e complejas (AppV1 + DOM masivo) resisten el reflow genérico | Alta | Alto | Adaptador por sistema (patrón strategy); fallback: reflow genérico conservador |
-| Conflictos con módulos táctiles (TouchVTT, Mobile Improvements, swipe-vtt) | Media | Alto | `CompatibilityService`: detectar y avisar en `ready`; nunca activarse junto a un competidor sin confirmación |
+| Conflictos con otros módulos táctiles | Media | Alto | `CompatibilityService`: detectar y avisar en `ready`; nunca activarse junto a un competidor sin confirmación |
 | iOS Safari: memoria, `100vh`, wake lock, vídeos | Alta | Medio | Presupuesto de texturas, `visualViewport` como fuente de verdad, Wake Lock API con fallback documentado |
 | Guerra de especificidad con temas/sistemas | Media | Medio | `@layer velvet-mobile` + data-attrs en `<html>`; prohibido `!important` salvo excepciones documentadas |
 | Leaks de listeners/observers en render loops | Media | Alto | Regla: todo `enable()` tiene `disable()` simétrico; `AbortController` por servicio; revisión por fase |
@@ -419,7 +416,7 @@ Cada fase produce `docs/FASE-N.md` con: qué se hizo, decisiones, checklist de p
 - **Con el core:** solo hooks documentados; nada de parchear prototipos. Si un caso lo exige (se prevé como mucho 1–2 en WM/canvas), `libWrapper` como dependencia *opcional* con fallback y registro en `docs/WRAPPERS.md`.
 - **Con sistemas:** el reflow genérico usa selectores estructurales de Foundry (`.window-app`, `.application`, `form.sheet`), nunca selectores internos de un sistema; lo específico vive en adaptadores (`sheets/adapters/pf2e.mjs`).
 - **Con otros módulos:**
-  - Lista de conflictos conocidos (TouchVTT, Mobile Improvements, swipe-vtt) → aviso al GM con opción de continuar.
+  - Lista de conflictos conocidos con otros módulos táctiles → aviso al GM con opción de continuar.
   - API pública para integración (`vm.windows.exclude`, `vm.sheets.registerAdapter`).
   - CSS íntegro bajo `@layer` y condicionado a `html[data-vm-device]` → inactivo = invisible para el resto.
 - **Con `pf2e-velvet-sheet`:** integración de primera clase vía el adaptador PF2e; la hoja Velvet podrá declarar sus propios breakpoints a través de la API.

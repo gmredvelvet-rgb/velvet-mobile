@@ -1,5 +1,210 @@
 # Changelog
 
+## 0.19.0 — conditions, effects and a settings screen (2026-07-29)
+
+### Added
+- **Conditions are now toggleable from the sheet.** A cloud of chips — blinded,
+  frightened, prone — that a player taps to apply and taps again to clear,
+  without ever leaving the mobile sheet. It sits at the top of the *Combat*
+  tab, next to the combat options it belongs with, and on systems without a
+  combat tab at the end of *Stats*.
+  - **The ones in effect come first**, so nobody hunts through forty greyed-out
+    chips to see what is actually affecting them. The rest stay folded behind a
+    *+N* button; expanding is remembered while the sheet is open, so an HP tick
+    mid-combat no longer collapses the list under your thumb.
+  - **Conditions that carry a value get a −/+ stepper** while they are on:
+    frightened 2 steps to frightened 1 and then off, the way PF2e's own
+    decrease works. The value shows as a badge on the chip rather than in its
+    name, so *Frightened 2* does not read twice.
+  - **PF2e goes through PF2e's own condition API** (`toggleCondition`,
+    `increaseCondition`, `decreaseCondition`), because its conditions are Items
+    with values rather than plain status effects. Persistent damage is left
+    out: it needs a damage type and a formula, which is a dialog rather than a
+    toggle, and PF2e omits it from its own list too.
+  - **Every other system gets them too**, built on core's `CONFIG.statusEffects`
+    registry and `Actor#toggleStatusEffect`. Foundry ships a default set even
+    when a system registers none, so this is the first interactive section the
+    generic adapter can always offer. Both the pre-v12 (`label`/`icon`) and
+    modern (`name`/`img`) field shapes are read.
+  - **Chips only appear for actors you own.** A control that always fails on
+    the server is worse than no control at all.
+  - The sheet now refreshes on `ActiveEffect` changes as well as `Item` ones,
+    so a condition applied from another client lights up straight away.
+
+- **Rests are on the sheet**, at the top of the *Stats* tab where they are
+  actually findable. Short and long rest on D&D 5e; Rest for the Night on
+  Pathfinder 2e and Starfinder 2e. Each opens the system's own rest flow, so
+  hit dice and the rest of the bookkeeping stay the system's business. A
+  system that offers none gets no section rather than dead buttons.
+  - **No short rest on PF2e or sf2e**, because neither has one. Take a
+    Breather belongs to the optional Stamina variant, which is off by
+    default — and `game.pf2e.actions` lists it either way, so its presence in
+    the registry says nothing about whether it applies.
+- **A long press on any item, spell or feature opens its action menu** — the
+  mobile stand-in for the desktop's right-click, which a finger cannot reach.
+  - **Send to chat** posts the card *without spending the item*. A tap already
+    uses it; nobody should lose a charge for reading a description.
+  - **Edit** opens the item's own sheet, for anything the mobile sheet does
+    not model. Only for items you own.
+  - **Prepare / unprepare** on D&D 5e spells, mirroring the row button.
+    Whether a casting method prepares at all is read from
+    `CONFIG.DND5E.spellcasting`, so **pact magic gets it too** — hard-coding
+    it to `method === "spell"` would have left warlocks unable to prepare.
+    Both the modern `system.prepared` field and the pre-5.1
+    `system.preparation` shape are handled, and the modern path never touches
+    the deprecated getter — reading it logged a warning per spell per redraw.
+  - PF2e's carry-state change joins that menu instead of owning the long press
+    on its own; the trailing button for it is unchanged.
+- Nothing destructive is in the menu. Deleting an item is not something anyone
+  should be one mis-press away from on a phone.
+
+- **Spell preparation is a first-class part of the D&D 5e spellbook.** The list
+  shows every spell you *know*; a bookmark button on each row toggles the ones
+  you prepared today, filled when prepared and hollow when not. It is a button
+  rather than only a long-press entry because choosing the day's spells means
+  toggling a dozen in a row, and a long press each time is the wrong tool.
+  - **Known but unprepared spells are dimmed**, so the list reads as "today's
+    spells" at a glance instead of "every spell I own".
+  - **A *Preparation* section at the top of the tab** shows the daily allowance
+    per spellcasting class — *Wizard · 3 / 5* — read from the class item where
+    the system keeps it. Spontaneous casters, who have no allowance, get no
+    section. Going over the allowance is flagged rather than hidden.
+  - Cantrips, at-will and innate magic and always-prepared spells have nothing
+    to toggle and get no button.
+- **Temporary hit points have their own place on the sheet.**
+  - **A *Temp HP* chip in the header row**, next to AC and Initiative, on every
+    system that models them. It is there at zero rather than appearing only
+    when you already have a shield: a control you have to go looking for is one
+    you forget to use, and the chip is also how you grant one. Tapping it opens
+    a prompt of its own — *Set* and *Clear* — rather than making you pick
+    temporary hit points out of the damage/heal buttons.
+  - **A striped band on the HP bar**, riding on top of real hit points, which
+    is the order they are spent in and something a number in brackets never
+    conveyed. It is clamped so a large shield cannot run off the end of the bar.
+  - **A changed maximum is spelled out** on the bar, since it quietly changes
+    what "full" means.
+
+- **D&D 5e gets an *Effects* section too**, below Conditions in the *Combat*
+  tab. Its model is quite different from PF2e's, so the controls are:
+  - **Enable / disable rather than counters.** A 5e effect is switched on or
+    off; the toggle writes `disabled`, and there is an *End effect* button
+    beside it. Effects suppressed by an unequipped or unattuned item cannot be
+    toggled here — only the item can do that — so they get the end button
+    alone rather than a control that would do nothing.
+  - **Only the temporary ones.** A 5e character carries a passive effect for
+    practically every feature they own; a phone list of forty "+1 to
+    something" entries is noise. What you need mid-session is the handful with
+    a clock on them, which is `isTemporary` — dnd5e's own getter, so concealed
+    effects are already excluded.
+  - **Conditions are not listed twice.** Effects carrying a status are the
+    condition chips directly above, so they are skipped here.
+  - **Durations are readable.** Core's own label for a time-based duration is
+    literally "3600 Seconds"; an hour-long spell now reads *1 h*. Turn-based
+    durations keep core's label, which already says *3 Rounds* and understands
+    the combat's turn order.
+  - Disabled and suppressed effects stay listed but dimmed, so they can be
+    turned back on.
+- **PF2e and Starfinder 2e get an *Effects* section**, below Conditions in the
+  *Combat* tab — the mobile counterpart of PF2e's own effects panel.
+  - **What you need to know about an effect is how much longer it lasts**, so
+    that is the sub-line. Counted in the unit the effect was written in rather
+    than the largest that divides evenly: ten rounds of Bless reads *10 rds*,
+    not *1 min*, because a player counting turns needs rounds. It drops a unit
+    only once the declared one falls below one — half an hour left on an
+    hour-long buff reads *30 min*.
+  - **Counter effects get −/+ steppers**; every effect gets an *End effect*
+    button. Both route through PF2e's own `increase`/`decrease`/`delete`, so
+    the semantics are the system's — including that decreasing a non-counter
+    effect ends it.
+  - **Expired effects stay listed but are dimmed.** PF2e leaves them for you
+    to dismiss, so hiding them would lose the dismiss; but they are not doing
+    anything and should not read as live. Aura-granted effects are marked.
+  - **Read-only for actors you do not own** — no controls rather than controls
+    that fail on the server.
+  - Durations are live: the sheet now redraws on `updateWorldTime`, so ending
+    a turn or advancing the clock updates the countdown without anything being
+    edited.
+- **Temporary hit points work on PF2e and Starfinder 2e too.** PF2e's data
+  model always carries `attributes.hp.temp`, so the shared helpers already
+  cover it — the header chip, the striped band and damage-through-the-shield
+  need no PF2e-specific path, and this is now covered by tests rather than
+  assumed.
+
+- **A settings screen built for a phone.** Foundry's own dialog is two columns
+  of desktop chrome: on a phone the category list eats the width and the panel
+  holding the actual controls is pushed off-screen, so most settings simply
+  could not be reached. The ⚙️ button now opens the same registry drawn as a
+  phone screen.
+  - **Packages, then settings.** A list of core, the game system and every
+    module with settings; tap one to see its settings. Two levels rather than
+    one endless scroll.
+  - **Search across everything**, matching names *and* hints — the setting you
+    cannot remember the name of is exactly the one you go looking for.
+  - **Real controls**: switches for booleans, native pickers for choices,
+    sliders for ranges, keypads for numbers, and a file browser for file
+    paths. Inputs are 16px so iOS does not zoom the page when you focus one.
+  - **Submenus work** — *Manage licence*, *Configure Interface* and anything
+    else a module registers open their own application.
+  - **Foundry's permission rules are Foundry's.** World-scoped settings need
+    the SETTINGS_MODIFY permission, restricted menus need it too, and the
+    permissions menu stays gamemaster-only. World settings are badged as such
+    so a GM knows they are changing the game for the whole table.
+  - **Changes save as you make them**, and anything needing a reload asks once
+    when the screen closes rather than after every toggle.
+  - If the screen fails to build for any reason it falls back to Foundry's own
+    dialog: cramped beats unreachable.
+
+### Fixed
+- **Damage no longer eats real hit points through a temporary shield.** Damage
+  now spends temporary hit points first and only spills the remainder into real
+  ones, the way every system that has them rules it. This was silently
+  corrupting character state, not a display rounding difference.
+- **A bonus to the hit point maximum is respected.** The bar, the percentage
+  and the heal clamp read the effective maximum (`effectiveMax`, or `max`
+  plus `tempmax`) rather than the base maximum, so anyone under an Aid spell
+  is no longer shown — and clamped to — the wrong number.
+- **Temporary hit points can now be granted** from the HP dialog, alongside
+  Damage and Heal. Only on systems that model them.
+- **The newest chat message is visible when the panel opens.** The scroll was
+  being issued while the panel was still animating up, so it measured a
+  container that was still growing, landed short, and left the roll that
+  opened the panel below the fold. It now waits for the panel to settle — and
+  an already-open panel scrolls for incoming messages too, which it never did.
+- **Panning the map no longer drags a selection box across it.** The gesture
+  layer now claims the pointer stream at the board and stops it reaching
+  Foundry's canvas, which was running its own drag-select underneath every
+  pan — so a finger meant to move the camera lassoed tokens instead.
+- **The camera no longer snaps back to your token on every step.** It now
+  follows only when the token nears the edge of the view, so a framing you
+  chose by panning survives your next move.
+
+### Changed
+- **Our dice roller steps aside when Dice Tray is installed.** Most tables
+  that want dice buttons already have it, and two rows of the same dice is
+  wasted thumb space. Uninstall or disable Dice Tray and ours comes back.
+
+### Notes for adapter authors
+- The view model gained a `type: "conditions"` section — `{ id, label, img,
+  active, value, onTap, onIncrease?, onDecrease? }`. Conditions deliberately do
+  not count towards "does this actor have a sheet worth drawing", since every
+  actor can be offered them.
+- Rows gained `menu: [{ id, icon, label, onTap }]`, which takes over the long
+  press. A row with one specific secondary action keeps using `onLong`: a menu
+  of one is a worse version of the action.
+- The model gained `applyTempHp`, null on systems without temporary hit points.
+  `hp.max` is now the *effective* maximum, and `hp` also carries `bonus` (what
+  the maximum gained or lost) and `tempPct` (the shield, on the bar's scale).
+- Rows gained `dim` for "present but not active today", and row `actions` gained
+  an optional `active` flag that renders them as toggles.
+- `BottomSheet#body` does not exist until the component is mounted — it is
+  created in `build()`. Call `mount()` before putting content into it;
+  `mount()` is idempotent, so a later `open()` costs nothing. Reading `body`
+  straight after `open()` happens to work only because an async function runs
+  synchronously up to its first `await`, which is too subtle to rely on.
+- `GestureEngine#on` accepts `capture` and `suppress`. They configure the
+  element's controller rather than a single recognizer, so the first
+  subscriber for an element decides them.
+
 ## 0.18.1 — footsteps go quiet (2026-07-26)
 
 ### Changed
@@ -636,7 +841,7 @@ no escape route. Three layers now guarantee both systems always play:
 ## 0.6.0 — Native mobile sheet (2026-07-10)
 
 The desktop sheet squeezed into the drawer was unusable on phones (clipped
-columns, broken scrolling). Like Swipe, Velvet Mobile now renders its **own
+columns, broken scrolling). Velvet Mobile now renders its **own
 mobile character sheet** from actor data — a phone UI, not a resized window.
 
 ### Added
@@ -664,16 +869,16 @@ mobile character sheet** from actor data — a phone UI, not a resized window.
 
 ### Added
 - **Boot veil**: from init, mobile clients see a pulsing "Velvet Mobile" wordmark instead of Foundry's desktop chrome flashing by while the world loads.
-- **Carousel, upgraded**: Swipe-style proximity effect (avatars grow/saturate near the center), the selected actor's name in a floating pill, and a live HP bar under each portrait (green/amber/red by threshold, updates on actor changes).
+- **Carousel, upgraded**: a proximity effect (avatars grow/saturate near the center), the selected actor's name in a floating pill, and a live HP bar under each portrait (green/amber/red by threshold, updates on actor changes).
 - **Haptic feedback** (where the platform supports it): selecting an actor, adding dice, rolling, dismissing the drawer.
 - **Dice roller, upgraded**: the Roll button shows the live formula ("2d6 + 1d20"), disables when the pool is empty, and long-pressing a die clears it from the pool.
 - **First-run hint**: a floating "swipe up or tap your portrait" pill on the home screen, once per session.
 - **Motion polish**: ambient Ken Burns drift on the home artwork (paused under the drawer, disabled with reduced motion), entrance animations for the carousel and button stack, pop-in for the dice bar, glow on the selected avatar, softer shadows and rounded corners on floating dialogs.
 
-## 0.4.0 — Swipe-style shell (2026-07-10)
+## 0.4.0 — Sheet-only shell (2026-07-10)
 
-Reworked the shell to follow the UX model of the Swipe VTT module's
-sheets-only mode.
+Reworked the shell around a sheet-only model: Foundry's chrome steps aside
+and the character sheet becomes the interface.
 
 ### Added
 - **Home screen**: scene artwork (or gradient) under a vignette instead of a black void.
@@ -681,7 +886,7 @@ sheets-only mode.
 - **Sheet as a drawer**: slides up fullscreen; a grip at the top drags down to dismiss back to home; swipe up from the bottom edge reopens it. No longer force-reopens on close.
 - **Floating button stack** (bottom right, always on top — even over the sheet): dice roller with multi-die picker (d4–d100 with counts, combined roll), chat toggle with unread dot, settings escape hatch.
 - **Chat auto-open**: new messages can open the chat panel automatically (setting: rolls only / all / never) at half height, with an auto-hide timer (setting, touch cancels).
-- **`core.noCanvas` management** (the Swipe approach): when mobile mode will activate, the game canvas is disabled at init so it never even gets created — huge memory/battery win. Reverted automatically (only if we set it) when mobile mode turns off, with a reload prompt.
+- **`core.noCanvas` management**: when mobile mode will activate, the game canvas is disabled at init so it never even gets created — huge memory/battery win. Reverted automatically (only if we set it) when mobile mode turns off, with a reload prompt.
 
 ### Removed
 - The bottom bar from 0.3.0 (replaced by carousel + button stack).

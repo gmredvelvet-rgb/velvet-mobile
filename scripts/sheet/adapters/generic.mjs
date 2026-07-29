@@ -15,8 +15,8 @@
  */
 
 import {
-  acOf, attempt, describe, firstAt, hpOf, itemTypeLabel,
-  makeApplyHp, num, safe, signed, t, text, titleCase, useItem
+  acOf, attempt, conditionsOf, conditionsSection, describe, firstAt, hpOf, itemMenu, itemTypeLabel,
+  makeApplyHp, makeApplyTempHp, num, safe, signed, t, text, titleCase, useItem
 } from "./shared.mjs";
 
 /** Actor types that are containers or scenery rather than a playable creature. */
@@ -148,21 +148,28 @@ export function model(actor) {
               label: item.name,
               badge: quantity !== null && quantity !== 1 ? `×${quantity}` : "",
               onTap: safe(() => useItem(actor, item)),
+              menu: itemMenu(actor, item),
               description: describe(item)
             };
           })
       }));
   }, []);
 
+  /* Conditions. Every system populates CONFIG.statusEffects — core ships a
+     default set even when the system registers nothing — so this is the one
+     interactive section the generic adapter can always offer. */
+  const conditions = attempt("conditions", () => conditionsOf(actor), []);
+
   const tabs = [];
-  if (abilities.length || skills.length) {
+  if (abilities.length || skills.length || conditions.length) {
     tabs.push({
       id: "stats",
       icon: "fa-solid fa-user",
       label: t("TabStats"),
       sections: [
         ...(abilities.length ? [{ type: "abilities", abilities }] : []),
-        ...(skills.length ? [{ title: t("Skills"), rows: skills }] : [])
+        ...(skills.length ? [{ title: t("Skills"), rows: skills }] : []),
+        ...conditionsSection(conditions)
       ]
     });
   }
@@ -180,6 +187,7 @@ export function model(actor) {
     hp: hpOf(actor),
     ac: acOf(actor),
     applyHp: makeApplyHp(actor),
+    applyTempHp: makeApplyTempHp(actor),
     stats: [],
     tabs
   };

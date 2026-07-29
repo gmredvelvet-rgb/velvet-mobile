@@ -1,9 +1,8 @@
 /**
- * Velvet Mobile — SheetShell (Swipe-style).
+ * Velvet Mobile — SheetShell.
  *
- * The whole mobile experience, modeled after Swipe VTT's sheets-only mode:
- * Foundry's chrome and canvas disappear and the client becomes a phone app
- * around the character sheet.
+ * The whole mobile experience: Foundry's chrome and canvas disappear and the
+ * client becomes a phone app around the character sheet.
  *
  *  - Home screen: the scene's artwork (or a dark gradient) under a vignette,
  *    with an avatar carousel at the bottom. Tapping an avatar — or swiping
@@ -34,6 +33,7 @@ import { modelFor } from "../sheet/adapters.mjs";
 import { hpOf } from "../sheet/adapters/shared.mjs";
 import { MobileSheet } from "../sheet/mobile-sheet.mjs";
 import { ChromeHider } from "./chrome-hider.mjs";
+import { MobileSettings } from "./mobile-settings.mjs";
 
 /** Class marking the drawer-presented sheet (CSS contract). */
 const PINNED_CLS = "vm-pinned";
@@ -132,6 +132,9 @@ export class SheetShell {
   /** @type {[string, number][]} Hook handles tied to the open rail. */
   #combatHooks = [];
 
+  /** @type {MobileSettings|null} Mobile settings screen. */
+  #settings = null;
+
   /** @type {BottomSheet|null} */
   #chatSheet = null;
 
@@ -226,6 +229,20 @@ export class SheetShell {
     this.#hook("updateItem", onItemChange);
     this.#hook("createItem", onItemChange);
     this.#hook("deleteItem", onItemChange);
+    // Core status effects are ActiveEffects, not Items, so condition chips
+    // would otherwise stay stale until something else redrew the sheet. An
+    // effect's parent is the actor, or the item the effect rides on.
+    const onEffectChange = (effect) => {
+      const actor = effect?.parent?.documentName === "Actor" ? effect.parent : effect?.parent?.actor;
+      if (actor && this.#msheet && actor.id === this.#msheet.actor?.id) this.#msheet.refresh();
+    };
+    this.#hook("createActiveEffect", onEffectChange);
+    this.#hook("updateActiveEffect", onEffectChange);
+    this.#hook("deleteActiveEffect", onEffectChange);
+    // Effect durations count down against world time, so advancing the clock
+    // (or ending a turn) changes what the sheet should say without any
+    // document being touched. refresh() coalesces, so a burst costs one redraw.
+    this.#hook("updateWorldTime", () => this.#msheet?.refresh());
     // Light the crosshair button while anything is targeted.
     this.#hook("targetToken", () => this.#refreshTargetState());
     // Roll prompts that linger stack up and bury each other on a phone.
@@ -286,6 +303,11 @@ export class SheetShell {
     this.#home = this.#carousel = this.#stack = this.#chatDot = this.#empty = this.#hint = null;
     this.#msheet?.destroy();
     this.#msheet = null;
+    // destroy() rather than dismiss(): teardown must not wait on an exit
+    // animation, and a reload prompt while the module is switching off would
+    // be asking about a screen that no longer exists.
+    this.#settings?.destroy();
+    this.#settings = null;
     this.#undecorate();
 
     this.#chrome.disable();
@@ -432,8 +454,8 @@ export class SheetShell {
   #onRenderSheet(app) {
     if (!this.#active || !app.actor) return;
     // Supported actors always present through our mobile sheet — intercept
-    // any Foundry sheet render (chat links, macros…) the Swipe way. Actors
-    // whose mobile sheet crashed are exempt, or this would loop forever.
+    // any Foundry sheet render (chat links, macros…). Actors whose mobile
+    // sheet crashed are exempt, or this would loop forever.
     if (this.#useMobileSheet(app.actor)) {
       app.close?.({ animate: false });
       this.#openMobileSheet(app.actor);
@@ -604,7 +626,7 @@ export class SheetShell {
       children: [el("div", { cls: "vm-carousel-label" }), track]
     });
     document.body.append(this.#carousel);
-    // Swipe's proximity effect: avatars grow/saturate as they near the center.
+    // Proximity effect: avatars grow/saturate as they near the centre.
     track.addEventListener("scroll", () => this.#scheduleProximity(), { passive: true });
     this.#refreshCarousel();
   }
@@ -735,11 +757,16 @@ export class SheetShell {
 
     const actions = [
       action("move", "fa-solid fa-gamepad", t("Move"), () => this.#toggleJoystick()),
-      action("dice", "fa-solid fa-dice-d20", t("Dice"), () => this.#toggleDiceBar()),
       action("chat", "fa-solid fa-comments", t("Chat"), () => this.toggleChat()),
       action("combat", "fa-solid fa-swords", t("Combat"), () => this.toggleCombat()),
-      action("settings", "fa-solid fa-gear", t("Settings"), () => game.settings.sheet.render(true))
+      action("settings", "fa-solid fa-gear", t("Settings"), () => this.openSettings())
     ];
+    // Dice Tray already puts a dice bar inside the chat panel, and most
+    // tables that want dice buttons have it. Two rows of the same dice is
+    // wasted thumb space, so ours steps aside when it is present.
+    if (!SheetShell.#hasDiceTray()) {
+      actions.splice(1, 0, action("dice", "fa-solid fa-dice-d20", t("Dice"), () => this.#toggleDiceBar()));
+    }
     // Targeting reads canvas token objects, so it only exists in map mode.
     if (Settings.map) {
       actions.splice(1, 0, action("target", "fa-solid fa-crosshairs", t("Target"), () => this.#toggleTargetPicker()));
@@ -927,8 +954,9 @@ export class SheetShell {
       // A refused step is not a failure: walls, illegal diagonals and scene
       // bounds all legitimately answer "no". Only throwing is a problem.
       const moved = await stepToken(tokenDoc, dx, dy);
-      // Keep the camera on the token so the player watches themselves move.
-      if (moved) this.#panToToken();
+      // Follow only when the token nears the edge, so a framing the player
+      // chose by panning survives their next step.
+      if (moved) this.#keepTokenInView();
     } catch (err) {
       Logger.error("Token move failed", err);
       this.#warnNoToken();
@@ -956,17 +984,62 @@ export class SheetShell {
    */
   #panToToken({ animate = true } = {}) {
     if (!Settings.map || !canvas?.ready) return;
-    const tokenDoc = this.#tokenDoc();
-    if (!tokenDoc) return;
-    const size = tokenDoc.parent?.grid?.size ?? 100;
-    const x = tokenDoc.x + ((tokenDoc.width ?? 1) * size) / 2;
-    const y = tokenDoc.y + ((tokenDoc.height ?? 1) * size) / 2;
+    const centre = this.#tokenCentre();
+    if (!centre) return;
+    const { x, y } = centre;
     try {
       if (animate) canvas.animatePan({ x, y, duration: 150 });
       else canvas.pan({ x, y });
     } catch (err) {
       Logger.debug("Camera pan failed", err);
     }
+  }
+
+  /**
+   * Follow the token only once it nears the edge of the view.
+   *
+   * Recentring on every step pins the camera to the token, so a player who
+   * pans sideways to look at something loses the framing on their next step
+   * and the map appears to snap back. Chasing only when the token leaves the
+   * middle of the screen keeps a deliberate framing intact while still never
+   * letting the token walk off-screen.
+   *
+   * @param {number} [margin] Fraction of the half-viewport the token may
+   *   wander into before the camera follows. 0.6 leaves a comfortable
+   *   dead zone without letting the token reach the edge.
+   */
+  #keepTokenInView(margin = 0.6) {
+    if (!Settings.map || !canvas?.ready) return;
+    const centre = this.#tokenCentre();
+    if (!centre) return;
+    try {
+      const scale = canvas.stage?.scale?.x || 1;
+      const pivot = canvas.stage?.pivot;
+      const screen = canvas.app?.screen;
+      const width = screen?.width || window.innerWidth;
+      const height = screen?.height || window.innerHeight;
+      if (!pivot) return void this.#panToToken();
+      // Half the visible map, in world units.
+      const halfW = width / 2 / scale;
+      const halfH = height / 2 / scale;
+      const outside = Math.abs(centre.x - pivot.x) > halfW * margin
+        || Math.abs(centre.y - pivot.y) > halfH * margin;
+      if (outside) this.#panToToken();
+    } catch (err) {
+      Logger.debug("Viewport check failed — recentring", err);
+      this.#panToToken();
+    }
+  }
+
+  /** @returns {{x:number, y:number}|null} The selected token's centre, in world units. */
+  #tokenCentre() {
+    const tokenDoc = this.#tokenDoc();
+    if (!tokenDoc) return null;
+    const size = tokenDoc.parent?.grid?.size ?? 100;
+    return {
+      x: tokenDoc.x + ((tokenDoc.width ?? 1) * size) / 2,
+      y: tokenDoc.y + ((tokenDoc.height ?? 1) * size) / 2
+    };
   }
 
   /** @returns {TokenDocument|null} The best owned token for the selected actor. */
@@ -1016,8 +1089,12 @@ export class SheetShell {
         this.#targetSheet = null;
       }
     });
-    this.#targetSheet.open();
+    // mount() before reading `body`: BottomSheet creates it in build(), so it
+    // is null until then. open() would mount too, but only as a side effect
+    // of its first synchronous half — too subtle a thing to depend on.
+    this.#targetSheet.mount();
     const body = this.#targetSheet.body;
+    this.#targetSheet.open();
     const el = VelvetComponent.el;
 
     if (game.user.targets.size) {
@@ -1233,35 +1310,79 @@ export class SheetShell {
   }
 
   /** @param {boolean} [auto] True when opened by an incoming message. */
-  openChat(auto = false) {
+  /**
+   * Open the mobile settings screen.
+   *
+   * Foundry's own dialog is two columns of desktop chrome that a phone cannot
+   * show — the category list takes the width and the controls are pushed
+   * off-screen — so this draws the same registry as a phone screen instead.
+   */
+  openSettings() {
+    if (this.#settings) return;
+    try {
+      this.#settings = new MobileSettings({ onDismiss: () => { this.#settings = null; } }).open();
+    } catch (err) {
+      // Never strand the user without a way into settings: the desktop
+      // dialog is cramped but it is better than nothing.
+      Logger.error("Mobile settings failed to open — falling back to Foundry's dialog", err);
+      this.#settings = null;
+      game.settings.sheet.render(true);
+    }
+  }
+
+  async openChat(auto = false) {
     if (this.#chatSheet || !this.#active) return;
     const chat = SheetShell.#chatElement();
     if (!chat) return void Logger.warn("Chat element not found");
 
-    this.#chatSheet = new BottomSheet({
-      title: game.i18n.localize(`${L10N}.Shell.Chat`),
-      snapPoints: auto ? [0.5, 0.9] : [0.9],
-      className: "vm-chat-panel",
-      backdrop: !auto,
-      onDismiss: () => this.#onChatDismissed()
-    });
-    this.#chatSheet.open();
+    // Everything here runs guarded. This method is async, so anything it
+    // throws becomes an unhandled rejection that nobody sees: the button
+    // would simply stop working, with Foundry's real chat log left orphaned
+    // inside a panel that never opened.
+    try {
+      this.#chatSheet = new BottomSheet({
+        title: game.i18n.localize(`${L10N}.Shell.Chat`),
+        snapPoints: auto ? [0.5, 0.9] : [0.9],
+        className: "vm-chat-panel",
+        backdrop: !auto,
+        onDismiss: () => this.#onChatDismissed()
+      });
 
-    this.#chatHome = { parent: chat.parentElement, next: chat.nextSibling };
-    this.#chatSheet.body.append(chat);
-    chat.classList.add("vm-chat-hosted");
-    this.#chatDot?.setAttribute("hidden", "");
-    this.#stack?.querySelector('[data-action="chat"]')?.classList.add("vm-selected");
-    ui.chat?.scrollBottom?.({ waitImages: false });
+      // Build before touching `body`: BottomSheet creates it in build(), so
+      // `body` is null until the component has mounted. mount() is idempotent
+      // (`element ??= build()`), so open() below re-mounts for free.
+      this.#chatSheet.mount();
 
-    if (auto) this.#scheduleChatHide();
-    // Any interaction with the panel cancels the auto-hide.
-    this.#chatAbort = new AbortController();
-    const { signal } = this.#chatAbort;
-    this.#chatSheet.element?.addEventListener("pointerdown", () => this.#cancelChatHide(), { capture: true, signal });
-    // Acting on a chat card (Attack, Damage, Save…) opens a roll prompt
-    // that the panel would cover, so step aside once the click is through.
-    chat.addEventListener("click", (event) => this.#onChatCardAction(event), { signal });
+      // Re-parent before animating: the log has to be inside the panel for
+      // the scroll container to have its final height when we scroll it.
+      this.#chatHome = { parent: chat.parentElement, next: chat.nextSibling };
+      this.#chatSheet.body.append(chat);
+      chat.classList.add("vm-chat-hosted");
+      this.#chatDot?.setAttribute("hidden", "");
+      this.#stack?.querySelector('[data-action="chat"]')?.classList.add("vm-selected");
+
+      if (auto) this.#scheduleChatHide();
+      // Bound before the animation, not after: a tap during the slide-in has
+      // to cancel the auto-hide too.
+      this.#chatAbort = new AbortController();
+      const { signal } = this.#chatAbort;
+      this.#chatSheet.element?.addEventListener("pointerdown", () => this.#cancelChatHide(), { capture: true, signal });
+      // Acting on a chat card (Attack, Damage, Save…) opens a roll prompt
+      // that the panel would cover, so step aside once the click is through.
+      chat.addEventListener("click", (event) => this.#onChatCardAction(event), { signal });
+
+      // The panel slides up over ~250ms. Scrolling before it lands measures a
+      // container that is still growing, lands short, and leaves the newest
+      // roll — the reason the panel opened at all — below the fold.
+      await this.#chatSheet.open();
+      this.#scrollChatToBottom();
+    } catch (err) {
+      Logger.error("Chat panel failed to open", err);
+      ui.notifications?.error(`Velvet Mobile: ${err?.message ?? err}`);
+      // Hand Foundry's chat log back where it came from before giving up.
+      this.#chatSheet?.destroy();
+      this.#onChatDismissed();
+    }
   }
 
   /**
@@ -1321,6 +1442,10 @@ export class SheetShell {
   #onChatMessage(message) {
     if (this.#chatSheet) {
       if (this.#chatHideTimer) this.#scheduleChatHide();
+      // An open panel does not scroll itself: Foundry appends the message and
+      // leaves it below the fold, so a roll made with the chat already up was
+      // invisible until you scrolled by hand.
+      this.#scrollChatToBottom();
       return;
     }
     const mode = Settings.chatOnMessage;
@@ -1463,6 +1588,45 @@ export class SheetShell {
   }
 
   /** @returns {HTMLElement|null} Foundry's chat log element across versions. */
+  /**
+   * Pin the chat log to its newest message.
+   *
+   * Deferred by two frames on purpose: `createChatMessage` fires when the
+   * document is created, before Foundry has appended the card, and the panel
+   * finishes settling in the same window. Scrolling earlier measures a
+   * container that does not yet contain the message we want to reveal.
+   *
+   * `ui.chat.scrollBottom()` is the supported route and is tried first; the
+   * direct assignment is a backstop for when the log is reparented into our
+   * panel and core's own lookup comes back empty.
+   */
+  #scrollChatToBottom() {
+    if (!this.#chatSheet) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!this.#chatSheet) return;
+      try {
+        ui.chat?.scrollBottom?.({ waitImages: false });
+      } catch (err) {
+        Logger.debug("Core chat scroll refused", err);
+      }
+      const chat = SheetShell.#chatElement();
+      const log = chat?.querySelector(".chat-log, #chat-log, ol.chat-log") ?? chat;
+      if (log instanceof HTMLElement && log.scrollHeight > log.clientHeight) {
+        log.scrollTop = log.scrollHeight;
+      }
+    }));
+  }
+
+  /**
+   * Whether Dice Tray is installed and active. Its module id is
+   * `dice-calculator` rather than anything resembling its title, so this is
+   * the one place that mapping is written down.
+   * @returns {boolean}
+   */
+  static #hasDiceTray() {
+    return game.modules?.get("dice-calculator")?.active === true;
+  }
+
   static #chatElement() {
     const element = ui.chat?.element;
     if (element instanceof HTMLElement) return element;

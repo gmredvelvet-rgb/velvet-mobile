@@ -60,8 +60,14 @@ export class CanvasController {
     this.#detach();
     const board = document.getElementById("board");
     if (!board || !services.gestures) return;
-    this.#off.push(services.gestures.on(board, "pan", (g) => this.#onPan(g), { threshold: 6 }));
-    this.#off.push(services.gestures.on(board, "pinch", (g) => this.#onPinch(g)));
+    // Capture + suppress: the pointer stream stops at the board and never
+    // reaches PIXI, so a pan is only ever a pan. Without this Foundry runs
+    // its drag-select at the same time and the finger lassoes tokens.
+    const claim = { capture: true, suppress: true };
+    this.#off.push(
+      services.gestures.on(board, "pan", (g) => this.#onPan(g), { threshold: 6, ...claim }),
+      services.gestures.on(board, "pinch", (g) => this.#onPinch(g), claim)
+    );
     Logger.debug("Canvas touch navigation attached");
   }
 

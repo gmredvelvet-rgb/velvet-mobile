@@ -43,12 +43,15 @@ export class GestureEngine {
    * @param {"tap"|"doubletap"|"longpress"|"swipe"|"edgeswipe"|"pan"|"pinch"} type
    * @param {(event: object) => void} handler
    * @param {object} [options]  Recognizer-specific options (see recognizers.mjs).
+   *   `capture` and `suppress` are element-level rather than per-recognizer:
+   *   they configure how the element's single controller listens, so the
+   *   first subscriber for an element decides them.
    * @returns {() => void} Unsubscribe function.
    */
   on(element, type, handler, options = {}) {
     let controller = this.#controllers.get(element);
     if (!controller) {
-      controller = new GestureController(element);
+      controller = new GestureController(element, { capture: options.capture, suppress: options.suppress });
       this.#controllers.set(element, controller);
     }
     const recognizer = createRecognizer(type, handler, options);

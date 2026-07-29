@@ -2,8 +2,8 @@
  * Velvet Mobile — MobileSheet.
  *
  * A native mobile character sheet, rendered by us from a system adapter's
- * view model (see sheet/adapters.mjs) — the Swipe approach: never squeeze
- * the desktop sheet into a phone; draw a phone UI instead.
+ * view model (see sheet/adapters.mjs). Never squeeze the desktop sheet into
+ * a phone; draw a phone UI instead.
  *
  * Structure (a fullscreen drawer):
  *   ┌───────────────────────────┐
@@ -47,6 +47,14 @@ export class MobileSheet extends VelvetComponent {
 
   /** @type {boolean} */
   #dismissed = false;
+
+  /**
+   * Whether the conditions cloud is showing the inactive chips too. Held on
+   * the sheet rather than in the DOM so a refresh() — an HP tick, a toggled
+   * condition — does not fold the list back up under the player's thumb.
+   * @type {boolean}
+   */
+  #conditionsOpen = false;
 
   /** @type {number|null} Coalesces refresh() bursts into one re-render. */
   #refreshTimer = null;
@@ -221,6 +229,24 @@ export class MobileSheet extends VelvetComponent {
       }));
     }
 
+    /* Temporary hit points, at the end of the chip row.
+       Shown even at zero, and only where the system models them at all: a
+       shield you have to remember to go looking for is a shield you forget
+       to spend, and the chip is also how you grant one. */
+    if (m.applyTempHp) {
+      const temp = m.hp?.temp ?? 0;
+      const chip = el("button", {
+        cls: `vm-ms-stat vm-tappable vm-ms-temp ${temp > 0 ? "vm-on" : ""}`.trim(),
+        attrs: { type: "button", "aria-label": `${t("TempHP")} ${temp}` },
+        children: [
+          el("span", { cls: "vm-ms-stat-value", text: temp > 0 ? `+${temp}` : "—" }),
+          el("span", { cls: "vm-ms-stat-label", text: t("TempHP") })
+        ]
+      });
+      this.#chromeScope.listen(chip, "click", () => this.#promptTempHp());
+      stats.push(chip);
+    }
+
     const hp = m.hp ? this.#buildHpBar(m.hp) : el("div", { cls: "vm-ms-hp vm-ms-hp-none" });
 
     return el("header", {
@@ -243,49 +269,118 @@ export class MobileSheet extends VelvetComponent {
   /** @param {object} hp @returns {HTMLElement} */
   #buildHpBar(hp) {
     const el = VelvetComponent.el;
-    const hpLabel = game.i18n.localize(`${L10N}.Sheet.HP`);
+    const t = (key) => game.i18n.localize(`${L10N}.Sheet.${key}`);
     let tone = "";
     if (hp.pct <= 25) tone = "vm-critical";
     else if (hp.pct <= 50) tone = "vm-low";
-    const temp = hp.temp ? ` (+${hp.temp})` : "";
-    const bar = el("button", {
-      cls: "vm-ms-hp",
-      attrs: { type: "button", "aria-label": `${hpLabel} ${hp.value}/${hp.max}` },
+
+    const children = [
+      el("span", { cls: `vm-ms-hp-fill ${tone}`.trim(), attrs: { style: `width: ${hp.pct}%` } })
+    ];
+    // The shield rides on top of real hit points, which is how it is spent.
+    if (hp.tempPct > 0) {
+      children.push(el("span", {
+        cls: "vm-ms-hp-temp",
+        attrs: { style: `left: ${hp.pct}%; width: ${hp.tempPct}%` }
+      }));
+    }
+
+    const label = [
+      `${hp.value} / ${hp.max}`,
+      hp.temp ? `+${hp.temp}` : "",
+      // A changed maximum is easy to miss and changes what "full" means.
+      hp.bonus ? `(${hp.bonus > 0 ? "+" : ""}${hp.bonus} ${t("MaxShort")})` : ""
+    ].filter(Boolean);
+
+    children.push(el("span", {
+      cls: "vm-ms-hp-text",
       children: [
-        el("span", {
-          cls: `vm-ms-hp-fill ${tone}`.trim(),
-          attrs: { style: `width: ${hp.pct}%` }
-        }),
-        el("span", { cls: "vm-ms-hp-text", text: `${hp.value} / ${hp.max}${temp}` })
-      ]
-    });
+        el("span", { text: label[0] }),
+        hp.temp ? el("span", { cls: "vm-ms-hp-tempval", text: label[1] }) : "",
+        hp.bonus ? el("span", { cls: "vm-ms-hp-bonus", text: label[label.length - 1] }) : ""
+      ].filter(Boolean)
+    }));
+
+    const aria = [
+      `${t("HP")} ${hp.value}/${hp.max}`,
+      hp.temp ? `${t("TempHP")} ${hp.temp}` : ""
+    ].filter(Boolean).join(", ");
+
+    const bar = el("button", { cls: "vm-ms-hp", attrs: { type: "button", "aria-label": aria }, children });
     this.#chromeScope.listen(bar, "click", () => this.#promptHp());
     return bar;
   }
 
-  /** Damage / heal prompt, applied through the adapter. */
+  /**
+   * Damage / heal / temporary prompt, applied through the adapter. Damage and
+   * healing are a delta; temporary hit points are a value that replaces
+   * whatever is there, so the three cannot share one number.
+   */
   async #promptHp() {
     const t = (key) => game.i18n.localize(`${L10N}.Sheet.${key}`);
     const read = (button) => Math.abs(button.form?.elements["vm-amount"]?.valueAsNumber || 0);
-    let delta = null;
+    const applyTempHp = this.#model.applyTempHp;
+
+    const buttons = [
+      { action: "damage", label: t("Damage"), icon: "fa-solid fa-heart-crack", callback: (_e, b) => ({ kind: "delta", amount: -read(b) }) },
+      { action: "heal", label: t("Heal"), icon: "fa-solid fa-heart-pulse", default: true, callback: (_e, b) => ({ kind: "delta", amount: read(b) }) }
+    ];
+    // Only where the system models them — see makeApplyTempHp.
+    if (applyTempHp) {
+      buttons.push({ action: "temp", label: t("TempHP"), icon: "fa-solid fa-shield-heart", callback: (_e, b) => ({ kind: "temp", amount: read(b) }) });
+    }
+
+    let result = null;
     try {
-      delta = await foundry.applications.api.DialogV2.wait({
+      result = await foundry.applications.api.DialogV2.wait({
         window: { title: this.actor.name },
         position: { width: 300 },
         content: `<input type="number" name="vm-amount" value="1" min="0" step="1" inputmode="numeric" autofocus
                    style="width: 100%; font-size: 16px; text-align: center;">`,
-        buttons: [
-          { action: "damage", label: t("Damage"), icon: "fa-solid fa-heart-crack", callback: (_e, b) => -read(b) },
-          { action: "heal", label: t("Heal"), icon: "fa-solid fa-heart-pulse", default: true, callback: (_e, b) => read(b) }
-        ],
+        buttons,
         rejectClose: false
       });
     } catch (err) {
       Logger.debug("HP dialog unavailable", err);
     }
-    if (typeof delta === "number" && delta !== 0) {
-      await this.#model.applyHp?.(delta);
+
+    if (result?.kind === "temp") await applyTempHp?.(result.amount);
+    // Zero damage and zero healing are both no-ops; zero temporary hit points
+    // is a real instruction — it clears them.
+    else if (result?.kind === "delta" && result.amount !== 0) await this.#model.applyHp?.(result.amount);
+  }
+
+  /**
+   * Grant or clear temporary hit points.
+   *
+   * Its own prompt rather than the damage/heal one: reaching temporary hit
+   * points from a chip labelled *Temp HP* should not make you pick out of
+   * three buttons, and the field wants to start at what you already have so
+   * a granted shield can be corrected rather than retyped.
+   */
+  async #promptTempHp() {
+    const t = (key) => game.i18n.localize(`${L10N}.Sheet.${key}`);
+    const current = this.#model.hp?.temp ?? 0;
+    const read = (button) => Math.abs(button.form?.elements["vm-temp"]?.valueAsNumber || 0);
+    let value = null;
+    try {
+      value = await foundry.applications.api.DialogV2.wait({
+        window: { title: t("TempHP") },
+        position: { width: 300 },
+        content: `<input type="number" name="vm-temp" value="${current}" min="0" step="1" inputmode="numeric" autofocus
+                   style="width: 100%; font-size: 16px; text-align: center;">`,
+        buttons: [
+          { action: "clear", label: t("Clear"), icon: "fa-solid fa-xmark", callback: () => 0 },
+          { action: "set", label: t("Set"), icon: "fa-solid fa-shield-heart", default: true, callback: (_e, b) => read(b) }
+        ],
+        rejectClose: false
+      });
+    } catch (err) {
+      Logger.debug("Temp HP dialog unavailable", err);
     }
+    // Zero is a real instruction here — it clears the shield — so only a
+    // dismissed dialog (null) is a no-op.
+    if (typeof value === "number") await this.#model.applyTempHp?.(value);
   }
 
   /** @returns {HTMLElement} */
@@ -330,11 +425,18 @@ export class MobileSheet extends VelvetComponent {
     for (const section of tab.sections ?? []) {
       // One broken section must never take the whole sheet down.
       try {
-        body.append(section.type === "abilities" ? this.#buildAbilities(section) : this.#buildSection(section));
+        body.append(this.#buildBySection(section));
       } catch (err) {
         Logger.error(`Mobile sheet: section "${section.title ?? section.type}" failed to render`, err);
       }
     }
+  }
+
+  /** @param {object} section @returns {HTMLElement} */
+  #buildBySection(section) {
+    if (section.type === "abilities") return this.#buildAbilities(section);
+    if (section.type === "conditions") return this.#buildConditions(section);
+    return this.#buildSection(section);
   }
 
   /** @param {object} section @returns {HTMLElement} */
@@ -365,19 +467,133 @@ export class MobileSheet extends VelvetComponent {
     return grid;
   }
 
+  /**
+   * Sticky section heading, or null when the section is untitled.
+   * @param {object} section
+   * @returns {HTMLElement|null}
+   */
+  #buildSectionHead(section) {
+    const el = VelvetComponent.el;
+    if (!section.title) return null;
+    return el("div", {
+      cls: "vm-ms-section-head",
+      children: [
+        el("h2", { text: section.title }),
+        section.badge ? el("span", { cls: "vm-ms-section-badge", text: section.badge }) : ""
+      ].filter(Boolean)
+    });
+  }
+
+  /**
+   * One condition chip. Conditions that carry a value get a −/+ stepper, but
+   * only while they are on — an off condition has no value to step, and the
+   * buttons would just be dead weight under a thumb.
+   * @param {object} condition
+   * @returns {HTMLElement}
+   */
+  #buildConditionChip(condition) {
+    const el = VelvetComponent.el;
+    const hasValue = condition.active && condition.value !== null && condition.value !== undefined;
+
+    const main = el("button", {
+      cls: "vm-ms-condition-main",
+      attrs: { type: "button", "aria-pressed": String(Boolean(condition.active)) },
+      children: [
+        condition.img
+          ? el("img", { cls: "vm-ms-condition-img", attrs: { src: condition.img, alt: "", loading: "lazy" } })
+          : "",
+        el("span", { cls: "vm-ms-condition-label", text: condition.label }),
+        hasValue ? el("span", { cls: "vm-ms-condition-value", text: String(condition.value) }) : ""
+      ].filter(Boolean)
+    });
+    if (condition.onTap) this.#contentScope.listen(main, "click", () => condition.onTap());
+
+    const steppers = [];
+    const stepping = condition.active
+      ? [["onDecrease", "fa-solid fa-minus", "−"], ["onIncrease", "fa-solid fa-plus", "+"]]
+      : [];
+    for (const [key, icon, sign] of stepping) {
+      if (!condition[key]) continue;
+      const btn = el("button", {
+        cls: "vm-ms-condition-step",
+        attrs: { type: "button", "aria-label": `${condition.label} ${sign}` },
+        children: [VelvetComponent.icon(icon)]
+      });
+      this.#contentScope.listen(btn, "click", (e) => {
+        e.stopPropagation();
+        condition[key]();
+      });
+      steppers.push(btn);
+    }
+
+    const chip = el("div", {
+      cls: `vm-ms-condition ${condition.active ? "vm-on" : ""}`.trim(),
+      children: [main, ...steppers]
+    });
+    if (!condition.active) chip.dataset.off = "1";
+    return chip;
+  }
+
+  /**
+   * Condition chips: a wrapped cloud of toggles, the ones currently on first
+   * so a player never has to hunt through forty greyed-out chips to see what
+   * is actually affecting them.
+   * @param {object} section
+   * @returns {HTMLElement}
+   */
+  #buildConditions(section) {
+    const el = VelvetComponent.el;
+    const cloud = el("div", { cls: "vm-ms-conditions" });
+    for (const condition of section.conditions ?? []) cloud.append(this.#buildConditionChip(condition));
+
+    const children = [this.#buildSectionHead(section), cloud].filter(Boolean);
+    const all = section.conditions ?? [];
+    if (!all.length) {
+      children.push(el("p", { cls: "vm-ms-empty", text: game.i18n.localize(`${L10N}.Sheet.Empty`) }));
+    }
+
+    /* A system's full status list runs to forty entries, which is ten rows of
+       chips sitting on top of whatever the player actually opened the tab for.
+       Collapsed, the section costs only the conditions currently in effect. */
+    const off = all.filter((condition) => !condition.active).length;
+    if (off) {
+      const more = el("button", {
+        cls: "vm-ms-condition-more",
+        attrs: {
+          type: "button",
+          "aria-expanded": String(this.#conditionsOpen),
+          "aria-label": game.i18n.localize(`${L10N}.Sheet.ConditionsShowAll`)
+        },
+        children: [el("span", { text: `+${off}` }), VelvetComponent.icon("fa-solid fa-chevron-down")]
+      });
+      this.#contentScope.listen(more, "click", () => {
+        this.#conditionsOpen = !this.#conditionsOpen;
+        this.#applyConditionsCollapse(cloud, more);
+      });
+      cloud.append(more);
+      this.#applyConditionsCollapse(cloud, more);
+    }
+    return el("section", { cls: "vm-ms-section", children });
+  }
+
+  /**
+   * Show or hide the inactive chips. Kept as a DOM toggle rather than a
+   * re-render so expanding does not cost a model rebuild, and so the state
+   * survives the HP ticks that call refresh() mid-combat.
+   * @param {HTMLElement} cloud
+   * @param {HTMLElement} more
+   */
+  #applyConditionsCollapse(cloud, more) {
+    const open = this.#conditionsOpen;
+    for (const chip of cloud.querySelectorAll('[data-off="1"]')) chip.hidden = !open;
+    more.setAttribute("aria-expanded", String(open));
+    more.classList.toggle("vm-open", open);
+  }
+
   /** @param {object} section @returns {HTMLElement} */
   #buildSection(section) {
     const el = VelvetComponent.el;
-    const children = [];
-    if (section.title) {
-      children.push(el("div", {
-        cls: "vm-ms-section-head",
-        children: [
-          el("h2", { text: section.title }),
-          section.badge ? el("span", { cls: "vm-ms-section-badge", text: section.badge }) : ""
-        ].filter(Boolean)
-      }));
-    }
+    const children = [this.#buildSectionHead(section)].filter(Boolean);
     const rows = section.rows ?? [];
     if (!rows.length) {
       children.push(el("p", { cls: "vm-ms-empty", text: game.i18n.localize(`${L10N}.Sheet.Empty`) }));
@@ -415,21 +631,32 @@ export class MobileSheet extends VelvetComponent {
     });
     if (row.onTap) this.#contentScope.listen(main, "click", () => row.onTap());
     // Secondary action: long press, or right-click for anyone testing on a
-    // desktop with mobile mode forced on.
-    if (row.onLong) {
+    // desktop with mobile mode forced on. A row with a menu opens it; a row
+    // with one specific secondary action (a MAP variant, a carry change)
+    // keeps that, because a menu of one is a worse version of the action.
+    const onLong = row.menu?.length
+      ? () => this.#promptRowMenu(row)
+      : row.onLong;
+    if (onLong) {
       this.#contentScope.gesture(main, "longpress", (g) => {
-        if (g.phase === "ended") row.onLong();
+        if (g.phase === "ended") onLong();
       });
       this.#contentScope.listen(main, "contextmenu", (e) => {
         e.preventDefault();
-        row.onLong();
+        onLong();
       });
     }
 
     const trailing = (row.actions ?? []).map((action) => {
       const btn = el("button", {
-        cls: "vm-ms-row-action",
-        attrs: { type: "button", "aria-label": action.label, "data-tooltip": action.label },
+        cls: `vm-ms-row-action ${action.active ? "vm-on" : ""}`.trim(),
+        attrs: {
+          type: "button",
+          "aria-label": action.label,
+          "data-tooltip": action.label,
+          // A toggle rather than a command: say so, and say which way it is.
+          ...(action.active === undefined ? {} : { "aria-pressed": String(Boolean(action.active)) })
+        },
         children: [VelvetComponent.icon(action.icon)]
       });
       this.#contentScope.listen(btn, "click", (e) => {
@@ -463,11 +690,42 @@ export class MobileSheet extends VelvetComponent {
       });
     }
 
-    const rowEl = el("div", {
-      cls: "vm-ms-row",
+    return el("div", {
+      cls: `vm-ms-row ${row.dim ? "vm-dim" : ""}`.trim(),
       children: [el("div", { cls: "vm-ms-row-line", children: [main, ...trailing, detailBtn].filter(Boolean) }), detail].filter(Boolean)
     });
-    return rowEl;
+  }
+
+  /**
+   * The long-press menu for a row: send to chat, edit, and whatever else the
+   * adapter offers for that kind of item. This is the mobile stand-in for the
+   * desktop's right-click menu, which a finger has no way to reach.
+   * @param {object} row
+   */
+  async #promptRowMenu(row) {
+    const entries = row.menu ?? [];
+    if (!entries.length) return;
+    try {
+      navigator.vibrate?.(8);
+    } catch { /* no haptics */ }
+    let picked = null;
+    try {
+      picked = await foundry.applications.api.DialogV2.wait({
+        window: { title: row.label },
+        position: { width: 320 },
+        buttons: entries.map((entry, index) => ({
+          action: entry.id ?? `menu${index}`,
+          label: entry.label,
+          icon: entry.icon,
+          default: index === 0,
+          callback: () => index
+        })),
+        rejectClose: false
+      });
+    } catch (err) {
+      Logger.debug("Row menu unavailable", err);
+    }
+    if (typeof picked === "number") await entries[picked]?.onTap?.();
   }
 
   /* -- Drag to dismiss ------------------------------------------------------ */
