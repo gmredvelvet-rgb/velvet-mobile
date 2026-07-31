@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.19.1 — roll dialogs follow your own setting (2026-07-29)
+
+### Fixed
+- **Tapping a skill, save or strike on Pathfinder 2e no longer forces the roll
+  straight into chat.** It now respects `showCheckDialogs` — the roll-dialog
+  preference in your own PF2e user settings — so a player who wants a
+  confirmation step gets one, and a player who does not keeps the instant
+  roll. Damage and criticals follow `showDamageDialogs` the same way.
+
+  Two things were wrong, and they cancelled each other into "always roll":
+  - Every roll passed `skipDialog: true`, overriding the preference outright.
+  - The synthetic event set `shiftKey` to the preference itself. PF2e treats
+    Shift as *inverting* the preference, so that flipped it for exactly the
+    players who had asked for dialogs. A tap is not a Shift-click, so
+    `shiftKey` is now always false and the preference travels in `skipDialog`,
+    derived the way PF2e derives it.
+
+  Reported from in-person play, where a mis-tap while browsing the sheet
+  posted a roll to the shared screen.
+
 ## 0.19.0 — conditions, effects and a settings screen (2026-07-29)
 
 ### Added

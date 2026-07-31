@@ -31,9 +31,35 @@ const INVENTORY_TYPES = new Set(["weapon", "armor", "shield", "equipment", "cons
 const FEATURE_TYPES = new Set(["feat", "action", "ancestry", "heritage", "background", "class", "deity", "lore"]);
 
 /**
- * PF2e reads roll modifiers off the originating DOM event (shift skips or
- * shows the dialog, depending on the user's own preference). We have no real
- * event, so synthesise one that honours that preference.
+ * Whether to skip the roll dialog, computed the way PF2e computes it.
+ *
+ * PF2e's own rule is `skipDialog = !game.user.settings.showCheckDialogs`,
+ * with Shift *inverting* it. We must derive it rather than force it: a player
+ * who has turned roll dialogs on wants them on the phone too, and forcing
+ * `skipDialog: true` is what made every tap fire straight into chat.
+ *
+ * @param {"check"|"damage"} [kind]
+ * @returns {boolean}
+ */
+function skipDialogFor(kind = "check") {
+  const settings = game.user?.settings ?? {};
+  const wants = kind === "damage" ? settings.showDamageDialogs : settings.showCheckDialogs;
+  return wants !== true;
+}
+
+/**
+ * PF2e reads roll modifiers off the originating DOM event. We have no real
+ * one, so synthesise a stand-in carrying the dataset some rolls read.
+ *
+ * `shiftKey` is deliberately false. PF2e treats Shift as *inverting* the
+ * user's dialog preference, so setting it to "the user wants dialogs" turned
+ * the preference upside down for exactly the people who had asked for them.
+ * A tap is not a Shift-click; the preference itself travels in `skipDialog`.
+ *
+ * Note also that `Statistic#roll` only derives parameters from an event that
+ * is a real `PointerEvent`, which this is not — so this object contributes
+ * its dataset and nothing else, and `skipDialog` has to be passed explicitly.
+ *
  * @param {object} [dataset]
  * @returns {object}
  */
@@ -42,14 +68,10 @@ function rollEvent(dataset = {}) {
   for (const [key, value] of Object.entries(dataset)) {
     if (value !== null && value !== undefined && value !== "") target.dataset[key] = String(value);
   }
-  const settings = game.user?.settings ?? {};
-  const showDialog = String(dataset.dialogType ?? "check") === "damage"
-    ? settings.showDamageDialogs === true
-    : settings.showCheckDialogs === true;
   return {
     target,
     currentTarget: target,
-    shiftKey: showDialog,
+    shiftKey: false,
     ctrlKey: false,
     altKey: false,
     metaKey: false,
@@ -60,7 +82,7 @@ function rollEvent(dataset = {}) {
 
 /** Roll a PF2e `Statistic`, whichever shape it takes. @param {object} statistic */
 const rollStatistic = (statistic) => safe(() => {
-  const args = { event: rollEvent(), skipDialog: true };
+  const args = { event: rollEvent(), skipDialog: skipDialogFor("check") };
   if (typeof statistic?.roll === "function") return statistic.roll(args);
   if (typeof statistic?.check?.roll === "function") return statistic.check.roll(args);
   throw new Error(t("NotRollable"));
@@ -642,14 +664,14 @@ function strikeRow(actor, strike, index) {
     actions.push({
       icon: "fa-solid fa-burst",
       label: t("Damage"),
-      onTap: safe(() => strike.damage({ event: rollEvent({ dialogType: "damage" }) }))
+      onTap: safe(() => strike.damage({ event: rollEvent({ dialogType: "damage" }), skipDialog: skipDialogFor("damage") }))
     });
   }
   if (typeof strike?.critical === "function") {
     actions.push({
       icon: "fa-solid fa-explosion",
       label: t("Critical"),
-      onTap: safe(() => strike.critical({ event: rollEvent({ dialogType: "damage" }) }))
+      onTap: safe(() => strike.critical({ event: rollEvent({ dialogType: "damage" }), skipDialog: skipDialogFor("damage") }))
     });
   }
 
@@ -674,8 +696,9 @@ function strikeRow(actor, strike, index) {
 
   const attack = (variantIndex) => safe(() => {
     const variant = variants[variantIndex] ?? variants[0];
-    if (typeof variant?.roll === "function") return variant.roll({ event: rollEvent(), skipDialog: true });
-    if (typeof strike?.roll === "function") return strike.roll({ event: rollEvent(), skipDialog: true });
+    const args = { event: rollEvent(), skipDialog: skipDialogFor("check") };
+    if (typeof variant?.roll === "function") return variant.roll(args);
+    if (typeof strike?.roll === "function") return strike.roll(args);
     throw new Error(t("NotRollable"));
   });
 
@@ -1011,7 +1034,7 @@ export function model(actor) {
       label: t("Initiative"),
       value: signed(initMod ?? 0),
       onTap: typeof initiative?.roll === "function"
-        ? safe(() => initiative.roll({ event: rollEvent(), skipDialog: true }))
+        ? safe(() => initiative.roll({ event: rollEvent(), skipDialog: skipDialogFor("check") }))
         : undefined
     });
 
