@@ -43,13 +43,38 @@ const SK = Object.freeze({
   tokenExpiry: `${MODULE_ID}:exp`,
   installationId: `${MODULE_ID}:iid`,
   tier: `${MODULE_ID}:tier`,
-  features: `${MODULE_ID}:features`
+  features: `${MODULE_ID}:features`,
+  verifiedUntil: `${MODULE_ID}:until`
 });
 
 /** Heartbeat cadence and the outage tolerance before locking down. */
 const HEARTBEAT_MS = 15 * 60 * 1000;
 const FIRST_HEARTBEAT_MS = 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000;
+
+/**
+ * Codes that are an actual verdict on entitlement: the subscription ended, the
+ * account was suspended, or this installation was released. These lock the
+ * module immediately — no grace, because there is nothing to wait for.
+ */
+const ENTITLEMENT_CODES = new Set([
+  "TIER_INSUFFICIENT", "ACCOUNT_INACTIVE", "USER_INVALID", "INSTALL_REVOKED", "INSTALL_INACTIVE"
+]);
+
+/**
+ * How long a past verification keeps this world running when the *credentials*
+ * fail rather than the entitlement — a rotated-token collision, a device
+ * mismatch, a revoked JWT. Those say nothing about whether the patron is
+ * paying, and this module gates in hard, so treating them as a verdict took a
+ * paying customer's module away over an accident.
+ *
+ * Deliberately a week rather than the 30 days Velvet Journals uses: that module
+ * only suppresses a reminder, whereas here the window is access to a paid
+ * product. Long enough to survive a mishap and a support reply, short enough
+ * that it is not a way to keep the module without paying — and an entitlement
+ * verdict clears it outright, so cancelling still locks the module at once.
+ */
+const TRUST_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Localize a `VELVETMOBILE.License.*` key, interpolating `data` when given.
@@ -87,6 +112,7 @@ export class LicenseClient {
   #fingerprint = null;
   #features = [];
   #tier = "none";
+  #verifiedUntil = 0;
   #heartbeatTimer = null;
   #firstHeartbeatTimer = null;
   #lastHeartbeat = 0;
@@ -103,7 +129,9 @@ export class LicenseClient {
 
   /**
    * Restore a stored licence, refreshing the token when needed.
-   * @returns {Promise<boolean>} Whether this installation is licensed.
+   * @returns {Promise<boolean>} Whether this world may run the module — either
+   * verified right now, or still inside the trust window a past verification
+   * bought (see TRUST_MS).
    */
   async initialize() {
     this.#installationId = this.#getOrCreateInstallationId();
@@ -116,32 +144,37 @@ export class LicenseClient {
         this.#tier = claims.tier ?? "none";
         this.#features = claims.features ?? [];
       } catch (err) {
+        // A local signature failure is a credential problem, not a statement
+        // about the subscription, so the trust window survives it.
         Logger.warn("Stored licence token rejected", err);
         this.#clearStoredTokens();
-        return false;
+        return this.isTrusted;
       }
       this.#startHeartbeat();
-      return true;
+      return this.isLicensed;
     }
 
     if (this.#refreshToken) {
       try {
         await this.#refresh();
         this.#startHeartbeat();
-        return true;
+        return this.isLicensed;
       } catch (err) {
         // A transient outage must never destroy a valid licence: keep the
         // tokens so the heartbeat can recover once the server is back.
         if (this.#isTransient(err)) {
           Logger.warn("Licence server unreachable — keeping stored credentials", err);
           this.#startHeartbeat();
-          return false;
+          return this.isTrusted;
         }
-        Logger.warn("Licence refresh definitively rejected", err);
+        // Only a verdict on entitlement ends the trust window; a rejected
+        // refresh on its own is a credential failure.
+        if (ENTITLEMENT_CODES.has(err?.code)) this.#endTrust();
+        Logger.warn("Licence refresh rejected", err);
         this.#clearStoredTokens();
       }
     }
-    return false;
+    return this.isTrusted;
   }
 
   /** @returns {string} */
@@ -151,7 +184,23 @@ export class LicenseClient {
 
   /** @returns {boolean} */
   get isLicensed() {
-    return this.#tier !== "none" && !this.#degraded;
+    if (this.#tier !== "none" && !this.#degraded) return true;
+    // A credential failure leaves the entitlement unknown, not refuted — see
+    // TRUST_MS. An entitlement verdict clears the window before we get here.
+    return this.isTrusted;
+  }
+
+  /**
+   * @returns {boolean} Whether a past verification is still inside its trust
+   * window. Cleared outright by an entitlement verdict or an explicit release.
+   */
+  get isTrusted() {
+    return this.#verifiedUntil > Date.now();
+  }
+
+  /** @returns {number} When the trust window lapses, as an epoch timestamp. */
+  get trustedUntil() {
+    return this.#verifiedUntil;
   }
 
   /** @returns {string|null} */
@@ -250,6 +299,9 @@ export class LicenseClient {
   async releaseInstallation() {
     try {
       await this.#apiCall("/license/release", { installationId: this.#installationId });
+      // Handing the slot to another machine on purpose — the benefit of the
+      // doubt goes with it.
+      this.#endTrust();
       this.#clearStoredTokens();
       this.#stopHeartbeat();
       await this.#setWorldLicensed(false);
@@ -268,6 +320,7 @@ export class LicenseClient {
     this.#refreshToken = localStorage.getItem(SK.refreshToken);
     this.#tokenExpiry = Number.parseInt(localStorage.getItem(SK.tokenExpiry) ?? "0", 10);
     this.#tier = localStorage.getItem(SK.tier) ?? "none";
+    this.#verifiedUntil = Number.parseInt(localStorage.getItem(SK.verifiedUntil) ?? "0", 10) || 0;
     try {
       const parsed = JSON.parse(localStorage.getItem(SK.features) ?? "[]");
       this.#features = Array.isArray(parsed) ? parsed : [];
@@ -290,17 +343,37 @@ export class LicenseClient {
     localStorage.setItem(SK.tokenExpiry, String(expiry));
     localStorage.setItem(SK.tier, this.#tier);
     localStorage.setItem(SK.features, JSON.stringify(this.#features));
+
+    // Every successful exchange restarts the window, so an active subscriber
+    // never runs it down. A "none" answer must not renew it: that is the server
+    // saying the entitlement is gone, not a credential mishap.
+    if (this.#tier !== "none") {
+      this.#verifiedUntil = Date.now() + TRUST_MS;
+      localStorage.setItem(SK.verifiedUntil, String(this.#verifiedUntil));
+    }
   }
 
+  /**
+   * Drop the credentials but keep the trust window: dead tokens are useless,
+   * yet nothing here says the subscription ended. {@link #endTrust} is what
+   * revokes that benefit of the doubt.
+   */
   #clearStoredTokens() {
     this.#accessToken = null;
     this.#refreshToken = null;
     this.#tokenExpiry = 0;
     this.#tier = "none";
     this.#features = [];
+    const keep = new Set([SK.installationId, SK.verifiedUntil]);
     for (const key of Object.values(SK)) {
-      if (key !== SK.installationId) localStorage.removeItem(key);
+      if (!keep.has(key)) localStorage.removeItem(key);
     }
+  }
+
+  /** End the trust window now — the entitlement itself was refused. */
+  #endTrust() {
+    this.#verifiedUntil = 0;
+    localStorage.removeItem(SK.verifiedUntil);
   }
 
   /** @returns {boolean} */
@@ -354,16 +427,31 @@ export class LicenseClient {
 
   /** @param {Error} err */
   #onHeartbeatFailure(err) {
-    // Definitive rejections lock down immediately; outages get the grace
-    // period, because a flaky connection must not interrupt a session.
-    const definitive = !this.#isTransient(err);
+    // An answer about entitlement is final: end the trust window and lock down
+    // now. Everything else — a rotated-token collision, a device mismatch, a
+    // revoked JWT, an outage — says nothing about whether the patron is paying,
+    // so it must not take a paid module away. Previously all of these were one
+    // "definitive" bucket, and a token-reuse false positive from two open tabs
+    // deactivated the shell outright.
+    if (ENTITLEMENT_CODES.has(err?.code)) {
+      this.#endTrust();
+      this.#degraded = true;
+      Logger.warn("Licence withdrawn by the server", err);
+      if (!game.user?.isGM) return;
+      this.#setWorldLicensed(false);
+      ui.notifications?.warn(`${MODULE_TITLE}: ${L("Locked")}`);
+      return;
+    }
+
     const expired = Date.now() - this.#lastHeartbeat > GRACE_MS;
-    if (!definitive && !expired) return;
+    if (this.#isTransient(err) && !expired) return;
     if (this.#degraded) return;
 
     this.#degraded = true;
     Logger.warn("Licence heartbeat failed", err);
-    if (!game.user?.isGM) return;
+    // Inside the trust window the module keeps running: the failure is with the
+    // credentials, and the GM already proved they were entitled.
+    if (this.isTrusted || !game.user?.isGM) return;
     this.#setWorldLicensed(false);
     ui.notifications?.warn(`${MODULE_TITLE}: ${L("Locked")}`);
   }
@@ -391,7 +479,22 @@ export class LicenseClient {
 
   /* -- Transport ------------------------------------------------------------ */
 
+  /**
+   * Serialises token rotation. The server revokes the old refresh token the
+   * moment it is used and treats a second presentation as reuse — a critical
+   * SECURITY_VIOLATION that revokes the whole family. This module gates in
+   * hard, so that verdict used to deactivate the shell outright.
+   * @type {Promise<void>|null}
+   */
+  #refreshInFlight = null;
+
   async #refresh() {
+    this.#refreshInFlight ??= this.#refreshOnce()
+      .finally(() => { this.#refreshInFlight = null; });
+    return this.#refreshInFlight;
+  }
+
+  async #refreshOnce() {
     const result = await this.#apiCall("/token/refresh", {
       refreshToken: this.#refreshToken,
       fingerprintHash: this.#fingerprint
