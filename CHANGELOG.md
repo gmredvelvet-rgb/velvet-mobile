@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.2 — un fallo de credenciales ya no apaga el modulo (2026-08-01)
+
+- Se separan los dos veredictos del servidor. Una respuesta sobre el derecho
+  (suscripcion terminada, cuenta suspendida, instalacion liberada) bloquea al instante,
+  como hasta ahora. Un fallo de credenciales —colision al rotar el token, device
+  mismatch, red caida— ya no: no dice nada sobre si el mecenas paga, y apagaba la shell
+  entera. Ahora entra en una ventana de confianza de 7 dias.
+- La rotacion del token de refresco se serializa, que era lo que provocaba el falso
+  positivo de reutilizacion con dos pestanas abiertas.
+
 ## 0.19.1 — roll dialogs follow your own setting (2026-07-29)
 
 ### Fixed
