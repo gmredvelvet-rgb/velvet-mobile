@@ -15,6 +15,16 @@
         "Tablet": "Forzar tablet",
         "Off": "Apagado (experiencia de escritorio)"
       },
+      "Theme": {
+        "Name": "Tema",
+        "Hint": "El aspecto de la interfaz móvil. Automático sigue el módulo de hoja Velvet que este mundo tenga activo y, si no hay ninguno, el sistema de juego — así el móvil coincide con la hoja que tus jugadores ya usan en el escritorio. Elige uno concreto para forzarlo.",
+        "Auto": "Automático (según el módulo de hoja)",
+        "Velvet": "Velvet Mobile (por defecto)",
+        "Aaa": "AAA D&D — oro y Cinzel",
+        "VelvetPf2e": "Velvet PF2e — vacío dorado",
+        "Cyber": "Cyberpunk — cian sobre azul noche",
+        "Hopefinder": "Hopefinder — manual de campo"
+      },
       "Map": {
         "Name": "Mostrar mapa",
         "Hint": "Mantiene el mapa de juego visible detrás de la interfaz móvil, con navegación táctil (arrastra para moverte, pellizca para acercar). Desactívalo para liberar memoria y batería en teléfonos: el mapa no se cargará en absoluto. Cambiarlo requiere recargar."
@@ -88,9 +98,14 @@
     },
     "Shell": {
       "Chat": "Chat",
-      "Menu": "Acciones rápidas",
+      "Back": "Atrás",
+      "Commands": "Acciones",
+      "More": "Más",
+      "Roster": "Cambiar de personaje",
+      "Sheet": "Personaje",
       "Dice": "Tirar dados",
       "Move": "Mover ficha",
+      "MoveStop": "Dejar de mover",
       "NoToken": "No tienes una ficha en la escena activa para mover.",
       "Target": "Objetivo",
       "TargetClear": "Quitar objetivo",
@@ -102,7 +117,6 @@
       "Combat": "Rastreador de combate",
       "Round": "Ronda",
       "NoEncounter": "No hay ningún combate en curso.",
-      "SwipeHint": "Desliza hacia arriba o toca tu retrato",
       "NoActorTitle": "Sin personaje disponible",
       "NoActorHint": "Pide a tu GM que asigne un personaje a tu usuario, o que te dé propiedad de uno con ficha en la escena.",
       "NoActorGMHint": "Asígnate un personaje en la configuración de usuario, o activa una escena con fichas. Para salir del modo móvil: botón de ajustes → Modo móvil → Apagado."

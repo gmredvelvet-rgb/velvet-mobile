@@ -14,6 +14,7 @@ import { LicenseClient } from "./license/license-client.mjs";
 import { LicenseUI } from "./license/license-ui.mjs";
 import { Logger } from "./core/logger.mjs";
 import { Settings } from "./core/settings.mjs";
+import { Theme } from "./core/theme.mjs";
 import { ServiceRegistry } from "./core/registry.mjs";
 import { services } from "./core/services.mjs";
 import { createAPI } from "./core/api.mjs";
@@ -76,9 +77,15 @@ class VelvetMobile {
       onScaleChange: (value) => {
         if (this.#running) UIState.setScale(value);
       },
+      // Purely an attribute swap on <html>: the new palette lands on the
+      // next paint, with no rebuild and nothing to reload.
+      onThemeChange: () => Theme.apply(),
       onDebugChange: (value) => Logger.setDebug(value)
     });
     Logger.setDebug(Settings.debug);
+    // Before the shell exists, so its first paint is already in the right
+    // palette. `game.modules` and `game.system` are both populated by init.
+    Theme.apply();
     // init runs before Foundry creates the canvas, so this applies to the
     // current session without a reload (on mobile the
     // canvas never exists at all).

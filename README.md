@@ -32,13 +32,30 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
 
 ## Features
 
-- **Home screen** — the scene's artwork under a vignette, with an **avatar carousel** at the bottom (every actor you own with a token in the scene, plus your assigned character).
-- **The sheet is a drawer** — tap an avatar (or swipe up from the bottom edge) and the sheet slides up fullscreen. Swipe left/right to change tabs. Drag the grip at the top down to dismiss.
-- **Floating buttons** (always on top, even over the sheet):
-  - 🎲 **dice roller** — tap dice to build a pool (2d6 + 1d20…), then Roll;
-  - 💬 **chat** — Foundry's real chat log in a bottom sheet (messages, rolls and input all work), with an unread dot;
-  - ⚔️ **encounter tracker** — turn order as a slim rail down the right edge: portraits with initiative, the active turn ringed and lit, defeated greyed out, round at the top. Tap anyone to centre the camera on them. Updates live as turns advance.
-  - ⚙️ **settings** — a settings screen built for a phone, not Foundry's two-column dialog: packages, then their settings, with a search box across the lot. Switches, sliders, pickers and a file browser; submenus open normally; world settings are badged and still respect Foundry's permissions.
+- **A status bar that answers the question you ask most** — portrait, name and hit points, always on screen. No opening the sheet to find out how you are doing. Tap it to open your character; the swap button opens the roster.
+- **One way in, one way out** — the sheet, chat, the encounter and the target list are all screens that slide in from the right. Go back with the chevron or by dragging from the left edge. The same gesture everywhere, whatever is on screen.
+- **A command bar, not a menu to open first** — the actions of play get a slot each along the bottom, one tap, no expanding step. Anything past the fifth moves into an overflow menu rather than shrinking the row.
+- **The roster is a grid** — every actor you own with a token in the scene, plus your assigned character, as cards with portrait and hit points. A party of eight is one glance.
+- **The sheet** — portrait, vitals and stat chips up top, tabs as a scrolling segmented row under them, content below. Drag left or right to change tabs.
+- 🎲 **Dice roller** — tap dice to build a pool (2d6 + 1d20…), then Roll.
+- 💬 **Chat** — Foundry's real chat log hosted in its own screen (messages, rolls and input all work), with an unread dot on the command bar.
+- ⚔️ **Encounter tracker** — turn order as full-width rows: portrait, name and initiative, the active turn lit and striped, defeated struck through, the round in the title bar. Tap anyone to centre the camera on them. Updates live as turns advance.
+- ⚙️ **Settings** — a settings screen built for a phone, not Foundry's two-column dialog: packages, then their settings, with a search box across the lot. Switches, sliders, pickers and a file browser; submenus open normally; world settings are badged and still respect Foundry's permissions.
+- **It looks like the sheet your table already uses** — the mobile interface picks up the design language of whichever Velvet sheet module the world has active, so the phone is not a second, unrelated product:
+
+  | Active module | System | Theme |
+  |---|---|---|
+  | AAA D&D Character Sheet | dnd5e | Gold on black, Cinzel |
+  | Velvet PF2e Sheet | pf2e | Gilded void, Cinzel Decorative |
+  | SF2e / PF2e Cyberpunk UI | sf2e | Cyan on navy, Rajdhani, hard corners |
+  | Hopefinder Survivor Sheet | pf2e | Olive and amber, Barlow Condensed, mono numerals |
+  | *none* | anything | Velvet Mobile's own purple |
+
+  Three of those serve pf2e, so the *module* decides before the system does. Override it any time under **Theme** in the settings.
+
+  A theme is not a palette swap: it reproduces the sheet's actual treatment — the gilded rule that fades out under a Velvet heading, the gold stripe down the left of a feature row, the holographic grid and scanlines behind the cyberpunk sheet, the stamped-metal cards and film grain of Hopefinder. Adapted, not transplanted: the desktop sheets set headings at 9–14px, so the *ratios* carry over (case, tracking, weight, the ornament) at sizes a phone can read, and every row keeps its 44px touch target. What a theme never changes is what is on screen or where it sits — every theme is the same interface underneath.
+
+  Fonts come from the companion module, which self-hosts them; without it installed you get the palette, the ornaments and a generic face.
 - **Conditions as chips** — apply and clear conditions with a tap, at the top of the *Combat* tab. The ones in effect sort first and the rest fold behind a *+N*; conditions that carry a value (frightened 2, clumsy 1) get a −/+ stepper. PF2e routes through its own condition items; every other system uses Foundry's status effects.
 - **Long press any row for its actions** — send to chat *without spending the item*, open its sheet to edit, prepare/unprepare a 5e spell, change a PF2e carry state. The mobile stand-in for the desktop's right-click menu.
 - **Effects** — what is running on you and how much longer it lasts, counted in the unit the effect was written in. Counter effects get −/+ steppers, everything gets *End effect*, expired ones are dimmed rather than hidden, and the countdown updates as the clock advances. PF2e counter effects get −/+ steppers; 5e effects switch on and off. Only temporary effects are listed — passive feature plumbing stays out of the way.
@@ -46,7 +63,7 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
 - **Spell preparation** (D&D 5e) — the list shows every spell you *know*; a bookmark on each row toggles the ones you prepared today, and what you did not prepare is dimmed. A *Preparation* section shows the daily allowance per class (*Wizard · 3 / 5*).
 - **Hit points done properly** — a *Temp HP* chip in the header row (tap to set or clear), a striped band on the bar showing the shield riding on top of real hit points, damage spent through it before real hit points, and a changed maximum respected and spelled out.
 - **Plays well with Dice Tray** — if you have it installed, our dice button steps aside rather than duplicating its bar.
-- **Chat auto-open** — incoming rolls (or all messages, per setting) open the chat at half height; it hides itself after a few seconds unless you touch it.
+- **Incoming rolls announce themselves** — a toast under the status bar shows the roll (or all messages, per setting) and fades on its own; tap it to open the full log. A line of text no longer takes the screen away from whatever you were doing.
 - **No canvas at all** — mobile clients run with Foundry's `core.noCanvas`, so the game canvas is never created: a large memory and battery win (reverted automatically if you turn mobile mode off).
 - Dialogs and item sheets still float on top, clamped to the screen. Keyboard-aware layout, notch/safe-area support, no accidental zoom or pull-to-refresh.
 
@@ -107,10 +124,12 @@ const vm = game.modules.get("velvet-mobile").api;
 
 vm.device.profile / vm.device.is("phone")
 vm.state.active
-vm.gestures.on(element, "swipe", handler)   // → unsubscribe
+vm.gestures.on(element, "longpress", handler)   // → unsubscribe
 vm.sheet.actor                              // selected actor
-vm.sheet.open(actorId)                      // select + open drawer
+vm.sheet.open(actorId)                      // select + push the sheet screen
 vm.sheet.openChat() / vm.sheet.closeChat()
+vm.theme.current / vm.theme.refresh()       // resolved theme id
+vm.components.NavStack                      // the shell's own screen stack
 vm.components.BottomSheet
 
 Hooks.on("velvetMobile.ready", (api) => {});

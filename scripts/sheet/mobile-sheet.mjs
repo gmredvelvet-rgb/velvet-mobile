@@ -5,29 +5,38 @@
  * view model (see sheet/adapters.mjs). Never squeeze the desktop sheet into
  * a phone; draw a phone UI instead.
  *
- * Structure (a fullscreen drawer):
+ * Structure (the content of a NavStack view):
  *   ┌───────────────────────────┐
- *   │ grip · close              │  drag down / tap to dismiss
- *   │ portrait  name            │
- *   │ subtitle  AC · stats      │
+ *   │ ‹  name          AC · HP  │  back chevron, identity, vitals
+ *   │ portrait  subtitle        │
  *   │ HP bar (tap → damage/heal)│
  *   ├───────────────────────────┤
- *   │ scrolling tab content     │  swipe left/right to change tab
+ *   │ Actions · Items · Spells  │  segmented tabs, scrolled horizontally
  *   ├───────────────────────────┤
- *   │ tab bar                   │
+ *   │ scrolling tab content     │  swipe left/right to change tab
  *   └───────────────────────────┘
+ *
+ * Tabs sit above the content, not below it: the bottom of the screen belongs
+ * to the shell's command bar, and two stacked bars down there would leave the
+ * player guessing which row they were tapping.
+ *
+ * Presentation — entering, leaving, the back gesture — belongs to the
+ * NavStack that hosts this sheet. It only draws itself.
  *
  * @module sheet/mobile-sheet
  */
 
 import { L10N } from "../core/constants.mjs";
 import { Logger } from "../core/logger.mjs";
+import { Theme } from "../core/theme.mjs";
 import { VelvetComponent } from "../components/component.mjs";
-import { Motion, DURATION } from "../motion/animation-engine.mjs";
+import { rendererFor, rowRole } from "./system-renderers.mjs";
 
-/** Drag distance (fraction of height) or velocity (px/ms) that dismisses. */
-const DISMISS_FRACTION = 0.28;
-const DISMISS_VELOCITY = 0.5;
+/**
+ * Pointer-down within this many px of the left edge belongs to the stack's
+ * back gesture, so the tab swipe stays out of its way.
+ */
+const BACK_EDGE = 30;
 
 export class MobileSheet extends VelvetComponent {
   /** @type {Actor} */
@@ -37,16 +46,16 @@ export class MobileSheet extends VelvetComponent {
   #buildModel;
 
   /** @type {(() => void)|null} */
-  #onDismiss;
+  #onBack;
+
+  /** @type {number} X of the last pointer-down on the body, for the tab swipe. */
+  #swipeStartX = Infinity;
 
   /** @type {object} Current view model. */
   #model;
 
   /** @type {string} Active tab id. */
   #tabId;
-
-  /** @type {boolean} */
-  #dismissed = false;
 
   /**
    * Whether the conditions cloud is showing the inactive chips too. Held on
@@ -75,13 +84,13 @@ export class MobileSheet extends VelvetComponent {
    * @param {object} options
    * @param {Actor} options.actor
    * @param {(actor: Actor) => object|null} options.buildModel
-   * @param {() => void} [options.onDismiss]
+   * @param {() => void} [options.onBack]  Invoked by the header's back chevron.
    */
-  constructor({ actor, buildModel, onDismiss = null }) {
+  constructor({ actor, buildModel, onBack = null }) {
     super();
     this.actor = actor;
     this.#buildModel = buildModel;
-    this.#onDismiss = onDismiss;
+    this.#onBack = onBack;
     this.#model = buildModel(actor);
     // Refuse to present an empty shell: throwing here routes the shell to
     // the system's own sheet, which always has something to show.
@@ -93,32 +102,12 @@ export class MobileSheet extends VelvetComponent {
 
   /* -- Lifecycle ---------------------------------------------------------- */
 
-  /** Mount fullscreen and slide in. @returns {this} */
-  open() {
-    this.mount();
-    Motion.slide(this.element, "translateY(100%)", "translateY(0)").then(() => {
-      if (this.element) this.element.style.transform = "";
-    });
-    return this;
-  }
-
-  /** Animate out, then destroy. Safe to call repeatedly. */
-  async dismiss() {
-    if (this.#dismissed) return;
-    this.#dismissed = true;
-    await Motion.slide(this.element, this.element?.style.transform || "translateY(0)", "translateY(100%)", { duration: DURATION.FAST });
-    const callback = this.#onDismiss;
-    this.#onDismiss = null;
-    this.destroy();
-    callback?.();
-  }
-
   /** Rebuild the model and re-render (coalesced across rapid updates). */
   refresh() {
     if (this.#refreshTimer) return;
     this.#refreshTimer = setTimeout(() => {
       this.#refreshTimer = null;
-      if (!this.element || this.#dismissed) return;
+      if (!this.element) return;
       try {
         this.#model = this.#buildModel(this.actor) ?? this.#model;
       } catch (err) {
@@ -165,15 +154,19 @@ export class MobileSheet extends VelvetComponent {
   build() {
     const el = VelvetComponent.el;
     this.#resetChromeScope();
+    const body = el("div", { cls: "vm-ms-body" });
     const root = el("section", {
-      cls: "vm-msheet",
-      attrs: { role: "dialog", "aria-label": this.actor.name },
-      children: [this.#buildHandle(), this.#buildHeader(), el("div", { cls: "vm-ms-body" }), this.#buildTabBar()]
+      cls: this.#rootClass(),
+      children: [this.#buildHeader(), this.#buildTabBar(), body]
     });
 
-    // Swipe between tabs anywhere on the body.
-    this.gesture(root.querySelector(".vm-ms-body"), "swipe", (g) => {
+    // Swipe between tabs anywhere on the body — except from the left edge,
+    // which the stack claims for the back gesture. Without this, dragging
+    // back also skipped a tab on the way out.
+    this.listen(body, "pointerdown", (event) => { this.#swipeStartX = event.clientX; }, { capture: true });
+    this.gesture(body, "swipe", (g) => {
       if (g.direction !== "left" && g.direction !== "right") return;
+      if (this.#swipeStartX <= BACK_EDGE) return;
       const tabs = this.#model.tabs;
       const index = tabs.findIndex((tab) => tab.id === this.#tabId);
       const next = tabs[index + (g.direction === "left" ? 1 : -1)];
@@ -182,22 +175,28 @@ export class MobileSheet extends VelvetComponent {
 
     // Deferred so #renderTab can query inside the built root.
     queueMicrotask(() => this.#renderTab(this.#tabId));
+    this.listen(document, "velvet-mobile:theme-changed", () => this.#rerenderVisuals());
     return root;
   }
 
-  /** @returns {HTMLElement} */
-  #buildHandle() {
-    const el = VelvetComponent.el;
-    const close = el("button", {
-      cls: "vm-ms-close",
-      attrs: { type: "button", "aria-label": game.i18n?.localize("Close") ?? "Close" },
-      children: [VelvetComponent.icon("fa-solid fa-chevron-down")]
-    });
-    this.listen(close, "click", () => this.dismiss());
+  /** Rebuild only DOM composition after a visual-style change. */
+  #rerenderVisuals() {
+    if (!this.element) return;
+    this.#resetChromeScope();
+    this.element.className = this.#rootClass();
+    this.element.querySelector(".vm-ms-header")?.replaceWith(this.#buildHeader());
+    this.element.querySelector(".vm-ms-tabs")?.replaceWith(this.#buildTabBar());
+    this.#renderTab(this.#tabId);
+  }
 
-    const handle = el("div", { cls: "vm-ms-handle", children: [el("span", { cls: "vm-ms-grip" }), close] });
-    this.gesture(handle, "pan", (g) => this.#onHandlePan(g));
-    return handle;
+  /** @returns {object} */
+  #renderer() {
+    return rendererFor(Theme.current, game.system?.id ?? "");
+  }
+
+  /** @returns {string} */
+  #rootClass() {
+    return `vm-msheet vm-msheet-${this.#renderer().id}`;
   }
 
   /** @returns {HTMLElement} */
@@ -249,15 +248,28 @@ export class MobileSheet extends VelvetComponent {
 
     const hp = m.hp ? this.#buildHpBar(m.hp) : el("div", { cls: "vm-ms-hp vm-ms-hp-none" });
 
+    const back = el("button", {
+      cls: "vm-nav-back",
+      attrs: { type: "button", "aria-label": game.i18n.localize(`${L10N}.Shell.Back`) },
+      children: [VelvetComponent.icon("fa-solid fa-chevron-left")]
+    });
+    this.#chromeScope.listen(back, "click", () => this.#onBack?.());
+
     return el("header", {
       cls: "vm-ms-header",
       children: [
-        el("img", { cls: "vm-ms-portrait", attrs: { src: this.actor.img || "icons/svg/mystery-man.svg", alt: this.actor.name } }),
         el("div", {
-          cls: "vm-ms-title",
+          cls: "vm-ms-identity",
           children: [
-            el("h1", { text: this.actor.name }),
-            el("span", { cls: "vm-ms-subtitle", text: m.subtitle ?? "" })
+            back,
+            el("img", { cls: "vm-ms-portrait", attrs: { src: this.actor.img || "icons/svg/mystery-man.svg", alt: "" } }),
+            el("div", {
+              cls: "vm-ms-title",
+              children: [
+                el("h1", { text: this.actor.name }),
+                el("span", { cls: "vm-ms-subtitle", text: m.subtitle ?? "" })
+              ]
+            })
           ]
         }),
         el("div", { cls: "vm-ms-stats", children: stats }),
@@ -425,7 +437,7 @@ export class MobileSheet extends VelvetComponent {
     for (const section of tab.sections ?? []) {
       // One broken section must never take the whole sheet down.
       try {
-        body.append(this.#buildBySection(section));
+        body.append(this.#buildBySection(section, tab));
       } catch (err) {
         Logger.error(`Mobile sheet: section "${section.title ?? section.type}" failed to render`, err);
       }
@@ -433,10 +445,10 @@ export class MobileSheet extends VelvetComponent {
   }
 
   /** @param {object} section @returns {HTMLElement} */
-  #buildBySection(section) {
+  #buildBySection(section, tab) {
     if (section.type === "abilities") return this.#buildAbilities(section);
     if (section.type === "conditions") return this.#buildConditions(section);
-    return this.#buildSection(section);
+    return this.#buildSection(section, tab);
   }
 
   /** @param {object} section @returns {HTMLElement} */
@@ -591,7 +603,7 @@ export class MobileSheet extends VelvetComponent {
   }
 
   /** @param {object} section @returns {HTMLElement} */
-  #buildSection(section) {
+  #buildSection(section, tab) {
     const el = VelvetComponent.el;
     const children = [this.#buildSectionHead(section)].filter(Boolean);
     const rows = section.rows ?? [];
@@ -600,7 +612,7 @@ export class MobileSheet extends VelvetComponent {
     }
     for (const row of rows) {
       try {
-        children.push(this.#buildRow(row));
+        children.push(this.#buildRow(row, section, tab));
       } catch (err) {
         Logger.error(`Mobile sheet: row "${row?.label}" failed to render`, err);
       }
@@ -609,8 +621,11 @@ export class MobileSheet extends VelvetComponent {
   }
 
   /** @param {object} row @returns {HTMLElement} */
-  #buildRow(row) {
+  #buildRow(row, section, tab) {
     const el = VelvetComponent.el;
+    const renderer = this.#renderer();
+    const role = rowRole(tab, section, row);
+    const defaultRenderer = renderer.id === "default";
 
     const main = el("button", {
       cls: "vm-ms-row-main",
@@ -623,10 +638,10 @@ export class MobileSheet extends VelvetComponent {
           cls: "vm-ms-row-text",
           children: [
             el("span", { cls: "vm-ms-row-label", text: row.label }),
-            row.sub ? el("span", { cls: "vm-ms-row-sub", text: row.sub }) : ""
+            defaultRenderer && row.sub ? el("span", { cls: "vm-ms-row-sub", text: row.sub }) : ""
           ].filter(Boolean)
         }),
-        row.badge ? el("span", { cls: "vm-ms-row-badge", text: row.badge }) : ""
+        defaultRenderer && row.badge ? el("span", { cls: "vm-ms-row-badge", text: row.badge }) : ""
       ].filter(Boolean)
     });
     if (row.onTap) this.#contentScope.listen(main, "click", () => row.onTap());
@@ -657,7 +672,10 @@ export class MobileSheet extends VelvetComponent {
           // A toggle rather than a command: say so, and say which way it is.
           ...(action.active === undefined ? {} : { "aria-pressed": String(Boolean(action.active)) })
         },
-        children: [VelvetComponent.icon(action.icon)]
+        children: [
+          VelvetComponent.icon(action.icon),
+          el("span", { cls: "vm-ms-row-action-label", text: action.label })
+        ]
       });
       this.#contentScope.listen(btn, "click", (e) => {
         e.stopPropagation();
@@ -673,7 +691,10 @@ export class MobileSheet extends VelvetComponent {
       detailBtn = el("button", {
         cls: "vm-ms-row-action",
         attrs: { type: "button", "aria-label": "info" },
-        children: [VelvetComponent.icon("fa-solid fa-circle-info")]
+        children: [
+          VelvetComponent.icon("fa-solid fa-circle-info"),
+          el("span", { cls: "vm-ms-row-action-label", text: "Info" })
+        ]
       });
       this.#contentScope.listen(detailBtn, "click", async (e) => {
         e.stopPropagation();
@@ -690,9 +711,18 @@ export class MobileSheet extends VelvetComponent {
       });
     }
 
-    return el("div", {
-      cls: `vm-ms-row ${row.dim ? "vm-dim" : ""}`.trim(),
-      children: [el("div", { cls: "vm-ms-row-line", children: [main, ...trailing, detailBtn].filter(Boolean) }), detail].filter(Boolean)
+    // Every renderer composes the line itself (see rowLine in
+    // system-renderers.mjs), so this hands over the pieces, not a layout.
+    return renderer.row({
+      el,
+      row,
+      section,
+      tab,
+      role,
+      main,
+      actions: [...trailing, detailBtn].filter(Boolean),
+      detail,
+      icon: VelvetComponent.icon
     });
   }
 
@@ -728,30 +758,4 @@ export class MobileSheet extends VelvetComponent {
     if (typeof picked === "number") await entries[picked]?.onTap?.();
   }
 
-  /* -- Drag to dismiss ------------------------------------------------------ */
-
-  /** @param {object} g Pan gesture. */
-  #onHandlePan(g) {
-    const element = this.element;
-    if (!element) return;
-    if (g.phase === "changed") {
-      element.style.transform = `translateY(${Math.max(0, g.dy)}px)`;
-      return;
-    }
-    if (g.phase !== "ended" && g.phase !== "cancelled") return;
-    const dy = Math.max(0, g.dy ?? 0);
-    const height = element.getBoundingClientRect().height;
-    if (dy > height * DISMISS_FRACTION || (g.vy ?? 0) > DISMISS_VELOCITY) {
-      try {
-        navigator.vibrate?.(8);
-      } catch { /* no haptics */ }
-      this.dismiss();
-    } else {
-      Motion.slide(element, `translateY(${dy}px)`, "translateY(0)", { duration: DURATION.FAST })
-        .then(() => {
-          if (this.element) this.element.style.transform = "";
-        });
-    }
-  }
 }
-

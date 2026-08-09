@@ -8,9 +8,15 @@
  * you push. Movement is grid-stepped by the shell, so this component only
  * emits normalized {-1,0,1} direction deltas.
  *
+ * It carries its own dismiss button, next to the thumb that is already on it,
+ * rather than sending the player back to the command bar to turn movement
+ * off. A mode that covers the screen should be closable from where it is
+ * operated, and not depend on some other surface still being there.
+ *
  * @module components/joystick
  */
 
+import { CLS, L10N } from "../core/constants.mjs";
 import { VelvetComponent } from "./component.mjs";
 
 /** Fraction of the base radius the knob must pass before movement engages. */
@@ -45,27 +51,41 @@ export class Joystick extends VelvetComponent {
   /** @type {number|null} Self-rescheduling step timer. */
   #timer = null;
 
+  /** @type {(() => void)|null} */
+  #onClose;
+
   /**
    * @param {object} options
    * @param {(dx: number, dy: number) => (void|Promise<void>)} options.onStep
+   * @param {() => void} [options.onClose]  Dismiss, from the stick's own button.
    */
-  constructor({ onStep }) {
+  constructor({ onStep, onClose = null }) {
     super();
     this.#onStep = onStep;
+    this.#onClose = onClose;
   }
 
   /** @override @returns {HTMLElement} */
   build() {
     const el = VelvetComponent.el;
+    const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
     this.#knob = el("div", { cls: "vm-joy-knob" });
     this.#base = el("div", {
       cls: "vm-joy-base",
       children: [el("span", { cls: "vm-joy-ring" }), this.#knob]
     });
+
+    const close = el("button", {
+      cls: `${CLS}-joy-close`,
+      attrs: { type: "button", "aria-label": t("MoveStop") },
+      children: [VelvetComponent.icon("fa-solid fa-xmark")]
+    });
+    this.listen(close, "click", () => this.#onClose?.());
+
     const root = el("div", {
       cls: "vm-joystick",
-      attrs: { role: "application", "aria-label": "Move token" },
-      children: [this.#base]
+      attrs: { role: "application", "aria-label": t("Move") },
+      children: [this.#base, close]
     });
     this.gesture(this.#base, "pan", (g) => this.#onPan(g), { threshold: 0 });
     return root;

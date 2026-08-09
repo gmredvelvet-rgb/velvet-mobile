@@ -32,6 +32,9 @@
  *         }],
  *         rows?: [{
  *           id, img?, label, sub?, badge?, prof?,
+ *           cost?,                         // action cost, as the character
+ *                                          // the system's action font draws
+ *                                          // ("1", "2", "3", "R", "F")
  *           dim?,                          // present but not active today
  *           onTap?,                        // roll / use
  *           onLong?,                       // one specific secondary action

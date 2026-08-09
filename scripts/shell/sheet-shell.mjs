@@ -4,28 +4,31 @@
  * The whole mobile experience: Foundry's chrome and canvas disappear and the
  * client becomes a phone app around the character sheet.
  *
- *  - Home screen: the scene's artwork (or a dark gradient) under a vignette,
- *    with an avatar carousel at the bottom. Tapping an avatar — or swiping
- *    up from the bottom edge — slides the actor's sheet up as a drawer.
- *  - The sheet drawer fills the viewport. A grip at the top can be dragged
- *    down to dismiss it back to the home screen.
- *  - A floating button stack (bottom-right) offers a dice roller (multi-die
- *    picker), the chat panel and the settings escape hatch — always on top,
- *    even while the sheet is open.
- *  - Chat opens as a bottom sheet hosting Foundry's real chat log. New
- *    messages can auto-open it (setting) and it auto-hides after a delay.
+ * The layout is two pieces of persistent chrome around a navigation stack:
+ *
+ *  - StatusBar (top): portrait, name and hit points, always readable. Tapping
+ *    it opens the character sheet; its buttons reach the roster and settings.
+ *  - CommandBar (bottom): the actions of play, one tap each, with anything
+ *    past the fourth in an overflow menu.
+ *  - NavStack (between): every screen that covers the home view — sheet,
+ *    chat, encounter, targets, roster — enters from the right and leaves by
+ *    the back chevron or a drag from the left edge. One mechanic, not three.
+ *  - Home: the scene's artwork under a vignette, behind all of it.
+ *
+ * Incoming chat does not push a screen; it raises a toast that fades on its
+ * own, so a roll never takes the display away from what you were doing.
  *
  * Everything reverses cleanly on disable().
  *
  * @module shell/sheet-shell
  */
 
-import { DEVICES, HOOKS, L10N, MODULE_ID, ROOT_ATTRS } from "../core/constants.mjs";
+import { CLS, DEVICES, HOOKS, L10N, MODULE_ID, ROOT_ATTRS } from "../core/constants.mjs";
 import { Logger } from "../core/logger.mjs";
 import { services } from "../core/services.mjs";
 import { Settings } from "../core/settings.mjs";
 import { VelvetComponent } from "../components/component.mjs";
-import { BottomSheet } from "../components/bottom-sheet.mjs";
+import { NavStack } from "../components/nav-stack.mjs";
 import { Joystick } from "../components/joystick.mjs";
 import { stepToken, resetFootsteps } from "../canvas/token-mover.mjs";
 import { Motion, DURATION } from "../motion/animation-engine.mjs";
@@ -34,16 +37,34 @@ import { hpOf } from "../sheet/adapters/shared.mjs";
 import { MobileSheet } from "../sheet/mobile-sheet.mjs";
 import { ChromeHider } from "./chrome-hider.mjs";
 import { MobileSettings } from "./mobile-settings.mjs";
+import { StatusBar } from "./status-bar.mjs";
+import { CommandBar } from "./command-bar.mjs";
 
-/** Class marking the drawer-presented sheet (CSS contract). */
+/** Class marking a Foundry sheet pinned fullscreen (CSS contract). */
 const PINNED_CLS = "vm-pinned";
-
-/** Drag distance (fraction of height) or velocity (px/ms) that dismisses the drawer. */
-const DISMISS_FRACTION = 0.28;
-const DISMISS_VELOCITY = 0.5;
 
 /** Dice offered by the roller, in display order. */
 const DICE = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
+
+/** How long a chat toast stays up before fading, in ms. */
+const TOAST_MS = 4500;
+
+/**
+ * Back-gesture geometry for the pinned Foundry sheet, mirroring the NavStack
+ * so the fallback presentation leaves exactly the way our own screens do.
+ */
+const BACK_EDGE = 30;
+const BACK_FRACTION = 0.35;
+const BACK_VELOCITY = 0.45;
+
+/** Stack view ids, so a screen can be found or replaced without a field each. */
+const VIEW = Object.freeze({
+  SHEET: "sheet",
+  ROSTER: "roster",
+  CHAT: "chat",
+  COMBAT: "combat",
+  TARGET: "target"
+});
 
 export class SheetShell {
   /** @type {string} */
@@ -81,20 +102,23 @@ export class SheetShell {
   /** @type {(() => void)|null} Restores the app's setPosition. */
   #unpinApp = null;
 
-  /** @type {(() => void)[]} Gesture unsubscribers tied to the current drawer. */
+  /** @type {(() => void)[]} Gesture unsubscribers tied to the pinned sheet. */
   #drawerGestures = [];
 
-  /** @type {(() => void)|null} Swipe-up-to-open unsubscriber. */
-  #offSwipeUp = null;
+  /** @type {number} X of the last pointer-down on the pinned sheet, for the tab swipe. */
+  #pinnedSwipeStartX = Infinity;
 
   /** @type {HTMLElement|null} Home screen (background + vignette). */
   #home = null;
 
-  /** @type {HTMLElement|null} Avatar carousel. */
-  #carousel = null;
+  /** @type {NavStack|null} Every screen that covers the home view. */
+  #nav = null;
 
-  /** @type {HTMLElement|null} Floating button stack. */
-  #stack = null;
+  /** @type {StatusBar|null} Persistent top chrome. */
+  #status = null;
+
+  /** @type {CommandBar|null} Persistent bottom chrome. */
+  #commands = null;
 
   /** @type {HTMLElement|null} Expandable dice bar. */
   #diceBar = null;
@@ -102,50 +126,41 @@ export class SheetShell {
   /** @type {Record<string, number>} Selected dice counts. */
   #dice = {};
 
-  /** @type {HTMLElement|null} Unread-chat indicator inside the stack. */
-  #chatDot = null;
-
   /** @type {HTMLElement|null} "No actor" overlay. */
   #empty = null;
 
-  /** @type {HTMLElement|null} First-run swipe hint pill. */
-  #hint = null;
-
-  /** @type {number|null} rAF id throttling carousel proximity updates. */
-  #proxRaf = null;
-
-  /** @type {Joystick|null} Token-movement stick (toggled from the speed-dial). */
+  /** @type {Joystick|null} Token-movement stick (toggled from the command bar). */
   #joystick = null;
 
   /** @type {HTMLElement|null} Zoom ± buttons, shown alongside the joystick. */
   #zoom = null;
 
-  /** @type {BottomSheet|null} Target picker panel. */
-  #targetSheet = null;
-
   /** @type {number} Throttles the "no token" warning. */
   #lastTokenWarn = 0;
 
-  /** @type {HTMLElement|null} Vertical turn-order rail down the right edge. */
-  #combatRail = null;
+  /** @type {import("../components/nav-stack.mjs").NavView|null} Open encounter screen. */
+  #combatView = null;
 
-  /** @type {[string, number][]} Hook handles tied to the open rail. */
+  /** @type {[string, number][]} Hook handles tied to the open encounter screen. */
   #combatHooks = [];
 
   /** @type {MobileSettings|null} Mobile settings screen. */
   #settings = null;
 
-  /** @type {BottomSheet|null} */
-  #chatSheet = null;
+  /** @type {import("../components/nav-stack.mjs").NavView|null} Open chat screen. */
+  #chatView = null;
 
   /** @type {{parent: HTMLElement, next: Node|null}|null} Original chat placement. */
   #chatHome = null;
 
-  /** @type {number|null} Auto-hide timer for the auto-opened chat panel. */
-  #chatHideTimer = null;
-
-  /** @type {AbortController|null} Listeners tied to the open chat panel. */
+  /** @type {AbortController|null} Listeners tied to the open chat screen. */
   #chatAbort = null;
+
+  /** @type {HTMLElement|null} Transient incoming-message toast. */
+  #toast = null;
+
+  /** @type {number|null} Fade timer for the toast. */
+  #toastTimer = null;
 
   /** @param {object} profile @returns {boolean} */
   shouldEnable(profile) {
@@ -185,8 +200,7 @@ export class SheetShell {
 
     this.#actorId = this.#initialActor()?.id ?? null;
     this.#buildHome();
-    this.#buildCarousel();
-    this.#buildStack();
+    this.#buildChrome();
 
     // Our UI exists — now Foundry's can go. The attribute drives the CSS
     // rules; ChromeHider covers whatever the markup moved or renamed.
@@ -198,11 +212,6 @@ export class SheetShell {
     this.#sweepOpenWindows();
     // canvasReady already fired before the shell enabled: claim the token now.
     this.#controlToken();
-
-    // Swipe up from the bottom edge opens the selected actor's sheet.
-    this.#offSwipeUp = services.gestures?.on(document.body, "edgeswipe", () => {
-      if (!this.#app && !this.#msheet && !this.#chatSheet && this.actor) this.openSheet();
-    }, { edge: "bottom" }) ?? null;
   }
 
   #registerHooks() {
@@ -214,13 +223,13 @@ export class SheetShell {
     this.#hook("canvasReady", () => {
       if (!Settings.map) this.#freezeCanvas(true);
       this.#refreshHome();
-      this.#refreshCarousel();
+      this.#refreshRoster();
       // Vision on fogged scenes needs a controlled token; players cannot
       // click one without a desktop UI, so take care of it for them.
       this.#controlToken();
     });
-    this.#hook("createToken", () => this.#refreshCarousel());
-    this.#hook("deleteToken", () => this.#refreshCarousel());
+    this.#hook("createToken", () => this.#refreshRoster());
+    this.#hook("deleteToken", () => this.#refreshRoster());
     this.#hook("updateActor", (actor) => this.#onActorUpdate(actor));
     // Item changes (equip, quantity, new loot…) refresh the open mobile sheet.
     const onItemChange = (item) => {
@@ -290,17 +299,22 @@ export class SheetShell {
     for (const [name, id] of this.#hooks) Hooks.off(name, id);
     this.#hooks.length = 0;
 
-    this.closeChat();
-    this.closeCombat();
+    // Hand Foundry's chat log back before the stack tears its host down, or
+    // the log leaves with it and the sidebar comes back empty.
+    this.#onChatDismissed();
+    this.#stopCombatHooks();
     this.#collapseDiceBar();
     this.#hideJoystick();
-    this.#targetSheet?.dismiss();
-    this.#offSwipeUp?.();
-    this.#offSwipeUp = null;
-    if (this.#proxRaf) cancelAnimationFrame(this.#proxRaf);
-    this.#proxRaf = null;
-    for (const el of [this.#home, this.#carousel, this.#stack, this.#empty, this.#hint]) el?.remove();
-    this.#home = this.#carousel = this.#stack = this.#chatDot = this.#empty = this.#hint = null;
+    this.#dismissToast();
+    // destroy() rather than popAll(): teardown must not wait on exit
+    // animations for screens that are about to be removed anyway.
+    this.#nav?.destroy();
+    this.#status?.destroy();
+    this.#commands?.destroy();
+    this.#nav = this.#status = this.#commands = null;
+    this.#chatView = this.#combatView = null;
+    for (const el of [this.#home, this.#empty]) el?.remove();
+    this.#home = this.#empty = null;
     this.#msheet?.destroy();
     this.#msheet = null;
     // destroy() rather than dismiss(): teardown must not wait on an exit
@@ -380,7 +394,7 @@ export class SheetShell {
       const old = this.#app;
       this.#undecorate();
       old?.close();
-      this.#refreshCarousel();
+      this.#refreshRoster();
       this.#controlToken();
       Hooks.callAll(HOOKS.ACTOR_CHANGED, actor);
     }
@@ -395,7 +409,6 @@ export class SheetShell {
     const actor = this.actor;
     if (!actor) return this.#showEmptyState();
     this.#hideEmptyState();
-    this.#dismissHint();
     // Supported systems get our native mobile sheet; anything else — or an
     // actor whose mobile sheet already crashed once — falls back to the
     // system's own sheet pinned fullscreen.
@@ -408,44 +421,69 @@ export class SheetShell {
     return !this.#msheetFailed.has(actor.id) && Boolean(modelFor(actor));
   }
 
-  /** Close the drawer back to the home screen. */
+  /** Close the sheet back to the home screen. */
   closeSheet() {
-    if (this.#msheet) return void this.#msheet.dismiss();
+    const view = this.#nav?.find(VIEW.SHEET);
+    if (view) return void view.pop();
     this.#app?.close();
   }
 
   /**
-   * Present our native mobile sheet for an actor.
+   * Present our native mobile sheet as a stack view.
+   *
+   * The sheet draws its own header (portrait, hit points, tabs), so the view
+   * carries no nav bar of its own — but it is still a stack view, so the back
+   * drag works on it exactly as it does everywhere else.
    * @param {Actor} actor
    */
   #openMobileSheet(actor) {
-    if (this.#msheet?.actor?.id === actor.id) return;
-    const old = this.#msheet;
-    this.#msheet = null;
-    old?.destroy();
+    // Guarded before the try below, which treats a throw as "this actor's
+    // mobile sheet is broken" — a missing stack is a shell problem, and
+    // blaming the actor for it would permanently demote them to the
+    // system's own sheet.
+    if (!this.#nav) return void Logger.warn("No navigation stack — cannot present the mobile sheet");
+
+    const open = this.#nav.find(VIEW.SHEET);
+    if (open && this.#msheet?.actor?.id === actor.id) {
+      // Already open for this actor. Selecting them again — from the roster,
+      // from a chat link — should surface that sheet, not stack a second one.
+      return void this.#nav.reveal(open);
+    }
 
     try {
-      document.documentElement.setAttribute(ROOT_ATTRS.DRAWER, "");
+      // Constructed before pushing: an actor the adapters cannot model throws
+      // here, and must not leave an empty view animating in behind the error.
       const sheet = new MobileSheet({
         actor,
         buildModel: modelFor,
-        onDismiss: () => {
+        onBack: () => this.closeSheet()
+      });
+      const view = this.#nav.push({
+        id: VIEW.SHEET,
+        className: `${CLS}-sheet-view`,
+        chrome: false,
+        onPop: () => {
           if (this.#msheet === sheet) this.#msheet = null;
-          document.documentElement.removeAttribute(ROOT_ATTRS.DRAWER);
-          if (this.#active) this.#showHintOnce();
+          // Only when nothing replaced it: swapping character pushes the new
+          // sheet before retiring this one, and the command must stay lit.
+          if (!this.#nav?.find(VIEW.SHEET)) this.#commands?.setActive("sheet", false);
+          sheet.destroy();
         }
       });
+      sheet.mount(view.body);
       this.#msheet = sheet;
-      sheet.open();
+      this.#commands?.setActive("sheet", true);
+      // Retired only once the replacement is up, so switching character never
+      // flashes the home screen between the two sheets.
+      if (open) this.#nav.remove(open);
     } catch (err) {
       // The mobile sheet is broken for this actor: remember it and fall
       // back to the system's own sheet so play can continue.
       Logger.error(`Mobile sheet failed for "${actor.name}" — using the native sheet`, err);
       ui.notifications?.warn(`Velvet Mobile: ${err?.message ?? err}`);
       this.#msheetFailed.add(actor.id);
-      this.#msheet?.destroy();
+      this.#nav?.find(VIEW.SHEET)?.pop();
       this.#msheet = null;
-      document.documentElement.removeAttribute(ROOT_ATTRS.DRAWER);
       actor.sheet?.render(true);
     }
   }
@@ -485,6 +523,7 @@ export class SheetShell {
 
     element.classList.add(PINNED_CLS);
     document.documentElement.setAttribute(ROOT_ATTRS.DRAWER, "");
+    this.#commands?.setActive("sheet", true);
     // Neutralize self-positioning so nothing fights the fullscreen CSS.
     if (!this.#unpinApp) {
       const original = app.setPosition;
@@ -494,7 +533,7 @@ export class SheetShell {
         SheetShell.#elementOf(app)?.classList.remove(PINNED_CLS);
       };
     }
-    this.#injectHandle(element);
+    this.#injectBackBar(element);
     this.#slideIn(element);
     const off = services.gestures?.on(element, "swipe", (g) => this.#onTabSwipe(g));
     if (off) this.#drawerGestures.push(off);
@@ -504,67 +543,90 @@ export class SheetShell {
   #onCloseSheet(app) {
     if (app !== this.#app) return;
     this.#undecorate();
-    // First time the user lands on the home screen, teach the way back.
-    if (this.#active) this.#showHintOnce();
   }
 
   /** Reverse every per-app modification. */
   #undecorate() {
     for (const off of this.#drawerGestures) off();
     this.#drawerGestures.length = 0;
-    SheetShell.#elementOf(this.#app)?.querySelector(".vm-drawer-handle")?.remove();
+    SheetShell.#elementOf(this.#app)?.querySelector(`.${CLS}-pinned-bar`)?.remove();
     this.#unpinApp?.();
     this.#unpinApp = null;
     this.#app = null;
-    document.documentElement.removeAttribute(ROOT_ATTRS.DRAWER);
+    this.#commands?.setActive("sheet", false);
+    // Only the pinned app owned this attribute if no stack view is up; the
+    // NavStack sets and clears it for its own screens.
+    if (!this.#nav?.depth) document.documentElement.removeAttribute(ROOT_ATTRS.DRAWER);
   }
 
-  /** Slide-up entrance for the drawer. @param {HTMLElement} element */
+  /** Enter from the right, matching every stack view. @param {HTMLElement} element */
   #slideIn(element) {
-    Motion.slide(element, "translateY(100%)", "translateY(0)").then(() => {
+    Motion.slide(element, "translateX(100%)", "translateX(0)").then(() => {
       element.style.transform = "";
     });
   }
 
   /**
-   * Grip strip at the top of the drawer: drag down to dismiss.
+   * Back bar across the top of a pinned Foundry sheet.
+   *
+   * This element belongs to Foundry, not to us, so it cannot live inside the
+   * NavStack — but it still has to leave the way everything else does. The
+   * bar gives it the same back chevron, and a left-edge drag gives it the
+   * same gesture.
    * @param {HTMLElement} element
    */
-  #injectHandle(element) {
-    const closeBtn = VelvetComponent.el("button", {
-      cls: "vm-drawer-close",
-      attrs: { type: "button", "aria-label": game.i18n?.localize("Close") ?? "Close" },
-      children: [VelvetComponent.icon("fa-solid fa-chevron-down")]
-    });
-    // A plain button guarantees the drawer can always be closed, even if
-    // pointer gestures misbehave on some browser.
-    closeBtn.addEventListener("click", () => {
+  #injectBackBar(element) {
+    const el = VelvetComponent.el;
+    const dismiss = () => {
       SheetShell.#haptic();
-      Motion.slide(element, "translateY(0)", "translateY(100%)", { duration: DURATION.FAST })
+      Motion.slide(element, element.style.transform || "translateX(0)", "translateX(100%)", { duration: DURATION.FAST })
         .then(() => this.closeSheet());
-    });
-    const handle = VelvetComponent.el("div", {
-      cls: "vm-drawer-handle",
-      children: [VelvetComponent.el("span", { cls: "vm-drawer-grip" }), closeBtn]
-    });
-    element.prepend(handle);
+    };
 
-    const off = services.gestures?.on(handle, "pan", (g) => {
+    const back = el("button", {
+      cls: `${CLS}-nav-back`,
+      attrs: { type: "button", "aria-label": game.i18n.localize(`${L10N}.Shell.Back`) },
+      children: [VelvetComponent.icon("fa-solid fa-chevron-left")]
+    });
+    // A plain button guarantees the sheet can always be closed, even if
+    // pointer gestures misbehave on some browser.
+    back.addEventListener("click", dismiss);
+
+    const bar = el("header", {
+      cls: `${CLS}-nav-bar ${CLS}-pinned-bar`,
+      children: [
+        back,
+        el("h2", { cls: `${CLS}-nav-title`, text: this.actor?.name ?? "" }),
+        el("div", { cls: `${CLS}-nav-actions` })
+      ]
+    });
+    element.prepend(bar);
+
+    // Where a drag started decides who owns it: the left edge goes back, and
+    // anywhere else is free to change tabs. Without this, dragging back also
+    // skipped a tab on the way out.
+    const onDown = (event) => { this.#pinnedSwipeStartX = event.clientX; };
+    element.addEventListener("pointerdown", onDown, { capture: true });
+    this.#drawerGestures.push(() => element.removeEventListener("pointerdown", onDown, { capture: true }));
+
+    let dragging = false;
+    const off = services.gestures?.on(element, "pan", (g) => {
+      if (g.phase === "began") {
+        dragging = (g.x - g.dx) <= BACK_EDGE;
+        return;
+      }
+      if (!dragging) return;
       if (g.phase === "changed") {
-        element.style.transform = `translateY(${Math.max(0, g.dy)}px)`;
+        element.style.transform = `translateX(${Math.max(0, g.dx)}px)`;
         return;
       }
       if (g.phase !== "ended" && g.phase !== "cancelled") return;
-      const dy = Math.max(0, g.dy ?? 0);
-      const height = element.getBoundingClientRect().height;
-      if (dy > height * DISMISS_FRACTION || (g.vy ?? 0) > DISMISS_VELOCITY) {
-        SheetShell.#haptic();
-        Motion.slide(element, `translateY(${dy}px)`, "translateY(100%)", { duration: DURATION.FAST })
-          .then(() => this.closeSheet());
-      } else {
-        Motion.slide(element, `translateY(${dy}px)`, "translateY(0)", { duration: DURATION.FAST })
-          .then(() => { element.style.transform = ""; });
-      }
+      dragging = false;
+      const dx = Math.max(0, g.dx ?? 0);
+      const width = element.getBoundingClientRect().width || window.innerWidth;
+      if (dx > width * BACK_FRACTION || (g.vx ?? 0) > BACK_VELOCITY) return void dismiss();
+      Motion.slide(element, `translateX(${dx}px)`, "translateX(0)", { duration: DURATION.FAST })
+        .then(() => { element.style.transform = ""; });
     });
     if (off) this.#drawerGestures.push(off);
   }
@@ -576,6 +638,8 @@ export class SheetShell {
    */
   #onTabSwipe(g) {
     if (g.direction !== "left" && g.direction !== "right") return;
+    // The left edge belongs to the back gesture (see #injectBackBar).
+    if (this.#pinnedSwipeStartX <= BACK_EDGE) return;
     const element = SheetShell.#elementOf(this.#app);
     if (!element) return;
 
@@ -616,183 +680,141 @@ export class SheetShell {
     bg.style.backgroundImage = escaped ? `url("${escaped}")` : "";
   }
 
-  /* -- Avatar carousel ------------------------------------------------------------ */
+  /* -- Persistent chrome ---------------------------------------------------------- */
 
-  #buildCarousel() {
-    const el = VelvetComponent.el;
-    const track = el("div", { cls: "vm-carousel-track" });
-    this.#carousel = el("nav", {
-      cls: "vm-carousel",
-      children: [el("div", { cls: "vm-carousel-label" }), track]
-    });
-    document.body.append(this.#carousel);
-    // Proximity effect: avatars grow/saturate as they near the centre.
-    track.addEventListener("scroll", () => this.#scheduleProximity(), { passive: true });
-    this.#refreshCarousel();
+  /** Status bar, navigation stack and command bar, in painting order. */
+  #buildChrome() {
+    const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
+
+    this.#status = new StatusBar({
+      onOpenSheet: () => this.openSheet(),
+      onOpenRoster: () => this.#toggleRoster(),
+      onOpenSettings: () => this.openSettings()
+    }).mount();
+
+    this.#nav = new NavStack().mount();
+
+    // Priority order: the first five get a slot, the rest go to the overflow
+    // menu. Targeting and movement only exist where there is a map to use
+    // them on, so a canvas-less table gets a shorter — and complete — bar.
+    const actions = [
+      { name: "sheet", icon: "fa-solid fa-user", label: t("Sheet"), onTap: () => this.openSheet() },
+      Settings.map
+        ? { name: "move", icon: "fa-solid fa-gamepad", label: t("Move"), onTap: () => this.#toggleJoystick() }
+        : null,
+      { name: "chat", icon: "fa-solid fa-comments", label: t("Chat"), onTap: () => this.toggleChat() },
+      { name: "combat", icon: "fa-solid fa-swords", label: t("Combat"), onTap: () => this.toggleCombat() },
+      Settings.map
+        ? { name: "target", icon: "fa-solid fa-crosshairs", label: t("Target"), onTap: () => this.#toggleTargetPicker() }
+        : null,
+      // Dice Tray already puts a dice bar inside the chat panel, and most
+      // tables that want dice buttons have it. Two rows of the same dice is
+      // wasted thumb space, so ours steps aside when it is present.
+      SheetShell.#hasDiceTray()
+        ? null
+        : { name: "dice", icon: "fa-solid fa-dice-d20", label: t("Dice"), onTap: () => this.#toggleDiceBar() }
+    ].filter(Boolean);
+
+    this.#commands = new CommandBar({ actions }).mount();
+    this.#refreshRoster();
   }
 
-  #refreshCarousel() {
-    const track = this.#carousel?.querySelector(".vm-carousel-track");
-    if (!track) return;
-    const available = this.#availableActors();
-    track.replaceChildren();
+  /* -- Roster --------------------------------------------------------------------- */
 
+  /**
+   * Re-read who is available, keep the status bar honest, and redraw the
+   * roster if it happens to be open.
+   */
+  #refreshRoster() {
+    const available = this.#availableActors();
     if (!available.length) {
-      this.#updateCarouselLabel(null);
+      this.#status?.setActor(null);
       if (!this.#app) this.#showEmptyState();
       return;
     }
     this.#hideEmptyState();
     if (!available.some((a) => a.id === this.#actorId)) this.#actorId = available[0].id;
+    this.#status?.setActor(this.actor);
 
-    for (const actor of available) {
-      track.append(this.#buildAvatar(actor));
-    }
-    this.#updateCarouselLabel(this.actor);
-    track.querySelector(".vm-selected")?.scrollIntoView({ inline: "center", block: "nearest" });
-    this.#scheduleProximity();
+    const view = this.#nav?.find(VIEW.ROSTER);
+    if (view) this.#fillRoster(view);
   }
 
-  /** @param {Actor} actor @returns {HTMLElement} */
-  #buildAvatar(actor) {
-    const el = VelvetComponent.el;
-    const hp = SheetShell.#hpOf(actor);
-    const children = [
-      el("img", { attrs: { src: actor.img || "icons/svg/mystery-man.svg", alt: actor.name, loading: "lazy" } })
-    ];
-    if (hp !== null) {
-      const fill = el("span", { cls: "vm-hp-fill", attrs: { style: `width: ${hp}%` } });
-      SheetShell.#applyHpTone(fill, hp);
-      children.push(el("span", { cls: "vm-hp", children: [fill] }));
-    }
-    const btn = el("button", {
-      cls: `vm-carousel-avatar ${actor.id === this.#actorId ? "vm-selected" : ""}`.trim(),
-      attrs: { type: "button", "aria-label": actor.name, "data-actor-id": actor.id },
-      children
+  #toggleRoster() {
+    const open = this.#nav?.find(VIEW.ROSTER);
+    if (open) return void open.pop();
+    if (!this.#nav) return;
+    const view = this.#nav.push({
+      id: VIEW.ROSTER,
+      title: game.i18n.localize(`${L10N}.Shell.Roster`),
+      className: `${CLS}-roster`
     });
-    btn.addEventListener("click", () => this.selectActor(actor.id));
-    return btn;
-  }
-
-  /** @param {Actor|null} actor */
-  #updateCarouselLabel(actor) {
-    const label = this.#carousel?.querySelector(".vm-carousel-label");
-    if (!label) return;
-    label.textContent = actor?.name ?? "";
-    label.classList.toggle("vm-visible", Boolean(actor));
-  }
-
-  /** Live HP + name updates for carousel avatars and the open sheet. @param {Actor} actor */
-  #onActorUpdate(actor) {
-    if (this.#msheet?.actor?.id === actor.id) this.#msheet.refresh();
-    const btn = this.#carousel?.querySelector(`[data-actor-id="${actor.id}"]`);
-    if (!btn) return;
-    const hp = SheetShell.#hpOf(actor);
-    const fill = btn.querySelector(".vm-hp-fill");
-    if (fill && hp !== null) {
-      fill.style.width = `${hp}%`;
-      SheetShell.#applyHpTone(fill, hp);
-    }
-    btn.querySelector("img")?.setAttribute("src", actor.img || "icons/svg/mystery-man.svg");
-    if (actor.id === this.#actorId) this.#updateCarouselLabel(actor);
-  }
-
-  /** @param {HTMLElement} fill @param {number} hp */
-  static #applyHpTone(fill, hp) {
-    fill.classList.toggle("vm-critical", hp <= 25);
-    fill.classList.toggle("vm-low", hp > 25 && hp <= 50);
+    this.#fillRoster(view);
   }
 
   /**
-   * @param {Actor} actor
-   * @returns {number|null} HP percentage, when the system exposes it.
-   *
-   * Delegates to the adapters' system-agnostic lookup instead of hardcoding
-   * `system.attributes.hp`: that path is a dnd5e/pf2e convention, so every
-   * other system's carousel avatars silently lost their health bar.
+   * A grid of character cards. A grid rather than a horizontal strip because
+   * a party of eight should be one glance, not eight swipes.
+   * @param {import("../components/nav-stack.mjs").NavView} view
    */
-  static #hpOf(actor) {
-    return hpOf(actor)?.pct ?? null;
-  }
-
-  /** rAF-throttled proximity pass over the carousel avatars. */
-  #scheduleProximity() {
-    if (this.#proxRaf) return;
-    this.#proxRaf = requestAnimationFrame(() => {
-      this.#proxRaf = null;
-      const track = this.#carousel?.querySelector(".vm-carousel-track");
-      if (!track) return;
-      const rect = track.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      for (const avatar of track.children) {
-        const r = avatar.getBoundingClientRect();
-        const distance = Math.abs(centerX - (r.left + r.width / 2));
-        const proximity = Math.max(0, 1 - distance / (r.width * 1.6 || 1));
-        avatar.style.setProperty("--p", proximity.toFixed(3));
-      }
-    });
-  }
-
-  /* -- Floating button stack --------------------------------------------------------- */
-
-  #buildStack() {
+  #fillRoster(view) {
     const el = VelvetComponent.el;
-    const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
-    this.#chatDot = el("span", { cls: "vm-stack-dot", attrs: { hidden: "" } });
-
-    // Speed-dial: one small button that fans out the three actions, so the
-    // stack never covers the sheet's tab bar.
-    const action = (name, icon, label, onTap) => {
-      const btn = el("button", {
-        cls: "vm-stack-btn",
-        attrs: { type: "button", "data-action": name, "aria-label": label },
-        children: [VelvetComponent.icon(icon)]
-      });
-      btn.addEventListener("click", () => {
-        this.#setDialOpen(false);
-        onTap();
-      });
-      return btn;
-    };
-
-    const actions = [
-      action("move", "fa-solid fa-gamepad", t("Move"), () => this.#toggleJoystick()),
-      action("chat", "fa-solid fa-comments", t("Chat"), () => this.toggleChat()),
-      action("combat", "fa-solid fa-swords", t("Combat"), () => this.toggleCombat()),
-      action("settings", "fa-solid fa-gear", t("Settings"), () => this.openSettings())
-    ];
-    // Dice Tray already puts a dice bar inside the chat panel, and most
-    // tables that want dice buttons have it. Two rows of the same dice is
-    // wasted thumb space, so ours steps aside when it is present.
-    if (!SheetShell.#hasDiceTray()) {
-      actions.splice(1, 0, action("dice", "fa-solid fa-dice-d20", t("Dice"), () => this.#toggleDiceBar()));
-    }
-    // Targeting reads canvas token objects, so it only exists in map mode.
-    if (Settings.map) {
-      actions.splice(1, 0, action("target", "fa-solid fa-crosshairs", t("Target"), () => this.#toggleTargetPicker()));
-    }
-    const dial = el("div", { cls: "vm-stack-dial", children: actions });
-
-    const main = el("button", {
-      cls: "vm-stack-main",
-      attrs: { type: "button", "aria-label": t("Menu"), "aria-expanded": "false" },
-      children: [VelvetComponent.icon("fa-solid fa-plus"), this.#chatDot]
-    });
-    main.addEventListener("click", () => {
-      SheetShell.#haptic(5);
-      this.#setDialOpen(!this.#stack.classList.contains("vm-open"));
-    });
-
-    this.#stack = el("div", { cls: "vm-stack", children: [dial, main] });
-    document.body.append(this.#stack);
+    const cards = this.#availableActors().map((actor) => this.#buildRosterCard(actor));
+    view.body.replaceChildren(el("div", { cls: `${CLS}-roster-grid`, children: cards }));
   }
 
-  /** @param {boolean} open */
-  #setDialOpen(open) {
-    if (!this.#stack) return;
-    this.#stack.classList.toggle("vm-open", open);
-    this.#stack.querySelector(".vm-stack-main")?.setAttribute("aria-expanded", String(open));
-    if (!open && this.#diceBar) this.#collapseDiceBar();
+  /** @param {Actor} actor @returns {HTMLElement} */
+  #buildRosterCard(actor) {
+    const el = VelvetComponent.el;
+    const hp = hpOf(actor);
+    const children = [
+      el("img", {
+        cls: `${CLS}-roster-portrait`,
+        attrs: { src: actor.img || "icons/svg/mystery-man.svg", alt: "", loading: "lazy" }
+      }),
+      el("span", { cls: `${CLS}-roster-name`, text: actor.name })
+    ];
+
+    if (hp) {
+      const fill = el("span", { cls: `${CLS}-roster-hp-fill`, attrs: { style: `width: ${hp.pct}%` } });
+      SheetShell.#applyHpTone(fill, hp.pct);
+      children.push(el("span", {
+        cls: `${CLS}-roster-hp`,
+        children: [fill, el("span", { cls: `${CLS}-roster-hp-text`, text: `${hp.value} / ${hp.max}` })]
+      }));
+    }
+
+    const card = el("button", {
+      cls: `${CLS}-roster-card ${actor.id === this.#actorId ? `${CLS}-selected` : ""}`.trim(),
+      attrs: { type: "button", "data-actor-id": actor.id },
+      children
+    });
+    card.addEventListener("click", () => this.selectActor(actor.id));
+    return card;
+  }
+
+  /** Live HP + name updates for the status bar, the roster and the open sheet. @param {Actor} actor */
+  #onActorUpdate(actor) {
+    if (this.#msheet?.actor?.id === actor.id) this.#msheet.refresh();
+    if (actor.id === this.#actorId) this.#status?.refresh();
+
+    const card = this.#nav?.find(VIEW.ROSTER)?.body.querySelector(`[data-actor-id="${actor.id}"]`);
+    if (!card) return;
+    const hp = hpOf(actor);
+    const fill = card.querySelector(`.${CLS}-roster-hp-fill`);
+    if (fill && hp) {
+      fill.style.width = `${hp.pct}%`;
+      SheetShell.#applyHpTone(fill, hp.pct);
+      card.querySelector(`.${CLS}-roster-hp-text`).textContent = `${hp.value} / ${hp.max}`;
+    }
+    card.querySelector("img")?.setAttribute("src", actor.img || "icons/svg/mystery-man.svg");
+    card.querySelector(`.${CLS}-roster-name`).textContent = actor.name;
+  }
+
+  /** @param {HTMLElement} fill @param {number} pct */
+  static #applyHpTone(fill, pct) {
+    fill.classList.toggle(`${CLS}-critical`, pct <= 25);
+    fill.classList.toggle(`${CLS}-low`, pct > 25 && pct <= 50);
   }
 
   /* -- Dice roller ------------------------------------------------------------------- */
@@ -837,7 +859,7 @@ export class SheetShell {
 
     this.#diceBar = el("div", { cls: "vm-dice-bar", children: [...dieButtons, rollBtn] });
     document.body.append(this.#diceBar);
-    this.#stack?.querySelector('[data-action="dice"]')?.classList.add("vm-selected");
+    this.#commands?.setActive("dice", true);
   }
 
   /** @returns {string} The pool as a roll formula, e.g. "2d6 + 1d20". */
@@ -864,7 +886,7 @@ export class SheetShell {
     this.#diceBar?.remove();
     this.#diceBar = null;
     this.#dice = {};
-    this.#stack?.querySelector('[data-action="dice"]')?.classList.remove("vm-selected");
+    this.#commands?.setActive("dice", false);
   }
 
   async #executeRoll() {
@@ -883,8 +905,11 @@ export class SheetShell {
     if (this.#joystick) return void this.#hideJoystick();
     // Every walk starts on the same foot, so short hops sound deliberate.
     resetFootsteps();
-    this.#joystick = new Joystick({ onStep: (dx, dy) => this.#moveToken(dx, dy) }).mount();
-    this.#stack?.querySelector('[data-action="move"]')?.classList.add("vm-selected");
+    this.#joystick = new Joystick({
+      onStep: (dx, dy) => this.#moveToken(dx, dy),
+      onClose: () => this.#hideJoystick()
+    }).mount();
+    this.#commands?.setActive("move", true);
     // Moving means watching the map: reveal it, own the token, center on
     // it, and offer zoom buttons (pinch is unreliable over PIXI).
     if (Settings.map) {
@@ -893,6 +918,10 @@ export class SheetShell {
       this.#panToToken({ animate: false });
       this.#buildZoom();
     }
+    // Hand the top of the screen over to the map while the player is driving.
+    // Tied to the joystick rather than to panning: a timer that restored the
+    // bar a second after each step would flicker on every square walked.
+    this.#setChromeHidden(true);
   }
 
   #hideJoystick() {
@@ -900,7 +929,20 @@ export class SheetShell {
     this.#joystick = null;
     this.#zoom?.remove();
     this.#zoom = null;
-    this.#stack?.querySelector('[data-action="move"]')?.classList.remove("vm-selected");
+    this.#commands?.setActive("move", false);
+    this.#setChromeHidden(false);
+  }
+
+  /**
+   * Slide the status bar off-screen and back, for modes that want the map.
+   *
+   * Deliberately only the top bar. The command bar holds the control that
+   * turns movement off again, and hiding the way out of a mode traps the
+   * player in it — which is exactly what it did.
+   * @param {boolean} hidden
+   */
+  #setChromeHidden(hidden) {
+    this.#status?.setHidden(hidden);
   }
 
   /** Zoom ± column, living and dying with the joystick. */
@@ -1061,18 +1103,20 @@ export class SheetShell {
   /* -- Target picker ------------------------------------------------------------ */
 
   #toggleTargetPicker() {
-    if (this.#targetSheet) return void this.#targetSheet.dismiss();
+    const open = this.#nav?.find(VIEW.TARGET);
+    if (open) return void open.pop();
     this.#openTargetPicker();
   }
 
   /**
-   * Bottom sheet listing the scene's tokens (hostiles first) — tap one to
-   * target it for the next attack. Far more reliable on touch than tapping
-   * tiny tokens on the PIXI canvas.
+   * A list of the scene's tokens (hostiles first) — tap one to target it for
+   * the next attack. Far more reliable on touch than tapping tiny tokens on
+   * the PIXI canvas.
    */
   #openTargetPicker() {
     const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
     if (!canvas?.ready) return void ui.notifications?.warn(t("NoTargets"));
+    if (!this.#nav) return;
 
     const mineId = this.#tokenDoc()?.id;
     const tokens = canvas.tokens.placeables
@@ -1081,20 +1125,12 @@ export class SheetShell {
         (a.document.disposition ?? 0) - (b.document.disposition ?? 0)
         || a.document.name.localeCompare(b.document.name));
 
-    this.#targetSheet = new BottomSheet({
+    const view = this.#nav.push({
+      id: VIEW.TARGET,
       title: t("Target"),
-      snapPoints: [0.6],
-      className: "vm-target-panel",
-      onDismiss: () => {
-        this.#targetSheet = null;
-      }
+      className: `${CLS}-targets`
     });
-    // mount() before reading `body`: BottomSheet creates it in build(), so it
-    // is null until then. open() would mount too, but only as a side effect
-    // of its first synchronous half — too subtle a thing to depend on.
-    this.#targetSheet.mount();
-    const body = this.#targetSheet.body;
-    this.#targetSheet.open();
+    const body = view.body;
     const el = VelvetComponent.el;
 
     if (game.user.targets.size) {
@@ -1106,7 +1142,7 @@ export class SheetShell {
       clear.addEventListener("click", () => {
         game.user.updateTokenTargets([]);
         SheetShell.#haptic();
-        this.#targetSheet?.dismiss();
+        view.pop();
       });
       body.append(clear);
     }
@@ -1135,26 +1171,25 @@ export class SheetShell {
         } catch (err) {
           Logger.error("Targeting failed", err);
         }
-        this.#targetSheet?.dismiss();
+        view.pop();
       });
       body.append(row);
     }
   }
 
-  /** Keep the crosshair dial button lit while something is targeted. */
+  /** Keep the crosshair command lit while something is targeted. */
   #refreshTargetState() {
-    this.#stack?.querySelector('[data-action="target"]')
-      ?.classList.toggle("vm-selected", game.user.targets.size > 0);
+    this.#commands?.setActive("target", game.user.targets.size > 0);
   }
 
   /* -- Encounter tracker ------------------------------------------------------- */
 
   toggleCombat() {
-    this.#combatRail ? this.closeCombat() : this.openCombat();
+    this.#combatView ? this.closeCombat() : this.openCombat();
   }
 
   /**
-   * The encounter's turn order, as a narrow rail down the right edge.
+   * The encounter's turn order, as a stack screen.
    *
    * Foundry's own tracker is a dense desktop widget that takes its height and
    * scrolling from sidebar-scoped rules, so borrowing the element the way the
@@ -1162,27 +1197,28 @@ export class SheetShell {
    * follows the same rule as the character sheet instead: never squeeze the
    * desktop UI onto a phone, draw a phone UI over the same data.
    *
-   * A rail rather than a bottom sheet because turn order is something you
-   * glance at *while* doing something else — it has to stay out of the way.
+   * Full-width rows rather than the old narrow rail: with the round in the
+   * title bar there is room to show each combatant's name outright, instead
+   * of hiding it in a tooltip a touch device cannot open.
    */
   openCombat() {
-    if (this.#combatRail || !this.#active) return;
+    if (this.#combatView || !this.#active || !this.#nav) return;
     if (!SheetShell.#visibleTurns().length) {
       return void ui.notifications?.info(game.i18n.localize(`${L10N}.Shell.NoEncounter`));
     }
 
-    this.#combatRail = VelvetComponent.el("nav", {
-      cls: "vm-combat-rail",
-      attrs: { "aria-label": game.i18n.localize(`${L10N}.Shell.Combat`) }
+    this.#combatView = this.#nav.push({
+      id: VIEW.COMBAT,
+      title: game.i18n.localize(`${L10N}.Shell.Combat`),
+      className: `${CLS}-combat`,
+      onPop: () => {
+        this.#combatView = null;
+        this.#stopCombatHooks();
+        this.#commands?.setActive("combat", false);
+      }
     });
-    document.body.append(this.#combatRail);
-    this.#stack?.querySelector('[data-action="combat"]')?.classList.add("vm-selected");
+    this.#commands?.setActive("combat", true);
     this.#renderCombat();
-    // Slides in from the edge it lives on, so where it came from is obvious.
-    const rail = this.#combatRail;
-    Motion.slide(rail, "translateX(120%)", "translateX(0)").then(() => {
-      if (rail.isConnected) rail.style.transform = "";
-    });
 
     // Follow the encounter live: turns advance, combatants join and die.
     for (const name of ["updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"]) {
@@ -1191,16 +1227,15 @@ export class SheetShell {
   }
 
   async closeCombat() {
+    // The view's onPop clears the field and the hooks; going through it keeps
+    // closing by back-gesture and closing by command on the same path.
+    await this.#combatView?.pop();
+  }
+
+  /** Drop the live-encounter hooks. Safe to call when none are registered. */
+  #stopCombatHooks() {
     for (const [name, id] of this.#combatHooks) Hooks.off(name, id);
     this.#combatHooks.length = 0;
-    this.#stack?.querySelector('[data-action="combat"]')?.classList.remove("vm-selected");
-    // Cleared before the animation so a second tap opens a fresh rail rather
-    // than toggling the one that is on its way out.
-    const rail = this.#combatRail;
-    this.#combatRail = null;
-    if (!rail) return;
-    await Motion.slide(rail, "translateX(0)", "translateX(120%)", { duration: DURATION.FAST });
-    rail.remove();
   }
 
   /** @returns {Combatant[]} Turn order this user is allowed to see. */
@@ -1209,85 +1244,52 @@ export class SheetShell {
     return (game.combat?.turns ?? []).filter((combatant) => combatant?.visible);
   }
 
-  /** Draw (or redraw) the turn order into the rail. */
+  /** Draw (or redraw) the turn order into the encounter screen. */
   #renderCombat() {
-    const rail = this.#combatRail;
-    if (!rail) return;
+    const view = this.#combatView;
+    if (!view) return;
     const combat = game.combat;
     const turns = SheetShell.#visibleTurns();
-    // The encounter ended while the rail was open: nothing left to track.
+    // The encounter ended while the screen was open: nothing left to track.
     if (!turns.length) return void this.closeCombat();
 
-    const el = VelvetComponent.el;
     const t = (key) => game.i18n.localize(`${L10N}.Shell.${key}`);
+    view.title = `${t("Combat")} · ${t("Round")} ${combat.round ?? 0}`;
 
-    const close = el("button", {
-      cls: "vm-combat-close",
-      attrs: { type: "button", "aria-label": game.i18n?.localize("Close") ?? "Close" },
-      children: [VelvetComponent.icon("fa-solid fa-xmark")]
-    });
-    close.addEventListener("click", () => {
-      SheetShell.#haptic();
-      this.closeCombat();
-    });
-
-    // Head stays put while the turn list scrolls under it, so the way out is
-    // never more than one tap away however long the encounter runs.
-    const head = el("div", {
-      cls: "vm-combat-head",
-      children: [close, el("div", {
-        cls: "vm-combat-round",
-        children: [
-          el("span", { cls: "vm-combat-round-label", text: t("Round") }),
-          el("span", { cls: "vm-combat-round-value", text: String(combat.round ?? 0) })
-        ]
-      })]
-    });
-
-    const list = el("div", { cls: "vm-combat-list" });
-    for (const combatant of turns) {
-      list.append(this.#buildCombatantChip(combatant, combat));
-    }
-
-    rail.replaceChildren(head, list);
-    list.querySelector(".vm-combat-active")?.scrollIntoView({ block: "nearest" });
+    view.body.replaceChildren(...turns.map((combatant) => this.#buildCombatantRow(combatant, combat)));
+    view.body.querySelector(".vm-combat-active")?.scrollIntoView({ block: "nearest" });
   }
 
   /**
-   * One combatant as a portrait chip. The rail is deliberately narrow, so the
-   * name lives in the tooltip and label rather than taking horizontal room.
+   * One combatant as a full-width row: portrait, name, initiative.
    * @param {Combatant} combatant @param {Combat} combat @returns {HTMLElement}
    */
-  #buildCombatantChip(combatant, combat) {
+  #buildCombatantRow(combatant, combat) {
     const el = VelvetComponent.el;
     const initiative = combatant.initiative;
     const children = [
       el("img", {
         cls: "vm-combat-portrait",
         attrs: { src: combatant.img || combatant.actor?.img || "icons/svg/mystery-man.svg", alt: "", loading: "lazy" }
-      })
+      }),
+      el("span", { cls: "vm-combat-name", text: combatant.name })
     ];
     if (initiative !== null && initiative !== undefined) {
       children.push(el("span", { cls: "vm-combat-init", text: String(initiative) }));
     }
 
-    const classes = ["vm-combat-chip"];
+    const classes = ["vm-combat-row"];
     if (combat.combatant?.id === combatant.id) classes.push("vm-combat-active");
     if (combatant.isDefeated) classes.push("vm-combat-defeated");
     if (combatant.hidden) classes.push("vm-combat-hidden");
 
-    const chip = el("button", {
+    const row = el("button", {
       cls: classes.join(" "),
-      attrs: {
-        type: "button",
-        "data-combatant-id": combatant.id,
-        "aria-label": combatant.name,
-        "data-tooltip": combatant.name
-      },
+      attrs: { type: "button", "data-combatant-id": combatant.id, "aria-label": combatant.name },
       children
     });
-    chip.addEventListener("click", () => this.#onCombatantTap(combatant));
-    return chip;
+    row.addEventListener("click", () => this.#onCombatantTap(combatant));
+    return row;
   }
 
   /** Centre the camera on whoever was tapped, when there is a map to pan. */
@@ -1303,13 +1305,8 @@ export class SheetShell {
     }
   }
 
-  /* -- Chat panel -------------------------------------------------------------- */
+  /* -- Settings ------------------------------------------------------------------ */
 
-  toggleChat() {
-    this.#chatSheet ? this.closeChat() : this.openChat();
-  }
-
-  /** @param {boolean} [auto] True when opened by an incoming message. */
   /**
    * Open the mobile settings screen.
    *
@@ -1330,65 +1327,63 @@ export class SheetShell {
     }
   }
 
-  async openChat(auto = false) {
-    if (this.#chatSheet || !this.#active) return;
+  /* -- Chat screen --------------------------------------------------------------- */
+
+  toggleChat() {
+    this.#chatView ? this.closeChat() : this.openChat();
+  }
+
+  /**
+   * Host Foundry's real chat log in a stack screen.
+   *
+   * Everything here runs guarded. Anything this throws would otherwise become
+   * an unhandled rejection that nobody sees: the button would simply stop
+   * working, with Foundry's chat log left orphaned inside a screen that never
+   * finished opening.
+   */
+  async openChat() {
+    if (this.#chatView || !this.#active || !this.#nav) return;
     const chat = SheetShell.#chatElement();
     if (!chat) return void Logger.warn("Chat element not found");
 
-    // Everything here runs guarded. This method is async, so anything it
-    // throws becomes an unhandled rejection that nobody sees: the button
-    // would simply stop working, with Foundry's real chat log left orphaned
-    // inside a panel that never opened.
     try {
-      this.#chatSheet = new BottomSheet({
+      this.#dismissToast();
+      this.#chatView = this.#nav.push({
+        id: VIEW.CHAT,
         title: game.i18n.localize(`${L10N}.Shell.Chat`),
-        snapPoints: auto ? [0.5, 0.9] : [0.9],
-        className: "vm-chat-panel",
-        backdrop: !auto,
-        onDismiss: () => this.#onChatDismissed()
+        className: `${CLS}-chat`,
+        onPop: () => this.#onChatDismissed()
       });
 
-      // Build before touching `body`: BottomSheet creates it in build(), so
-      // `body` is null until the component has mounted. mount() is idempotent
-      // (`element ??= build()`), so open() below re-mounts for free.
-      this.#chatSheet.mount();
-
-      // Re-parent before animating: the log has to be inside the panel for
+      // Re-parent before scrolling: the log has to be inside the screen for
       // the scroll container to have its final height when we scroll it.
       this.#chatHome = { parent: chat.parentElement, next: chat.nextSibling };
-      this.#chatSheet.body.append(chat);
+      this.#chatView.body.append(chat);
       chat.classList.add("vm-chat-hosted");
-      this.#chatDot?.setAttribute("hidden", "");
-      this.#stack?.querySelector('[data-action="chat"]')?.classList.add("vm-selected");
+      this.#commands?.setBadge("chat", false);
+      this.#commands?.setActive("chat", true);
 
-      if (auto) this.#scheduleChatHide();
-      // Bound before the animation, not after: a tap during the slide-in has
-      // to cancel the auto-hide too.
       this.#chatAbort = new AbortController();
-      const { signal } = this.#chatAbort;
-      this.#chatSheet.element?.addEventListener("pointerdown", () => this.#cancelChatHide(), { capture: true, signal });
       // Acting on a chat card (Attack, Damage, Save…) opens a roll prompt
-      // that the panel would cover, so step aside once the click is through.
-      chat.addEventListener("click", (event) => this.#onChatCardAction(event), { signal });
+      // that the screen would cover, so step aside once the click is through.
+      chat.addEventListener("click", (event) => this.#onChatCardAction(event), { signal: this.#chatAbort.signal });
 
-      // The panel slides up over ~250ms. Scrolling before it lands measures a
+      // The screen slides in over ~250ms. Scrolling before it lands measures a
       // container that is still growing, lands short, and leaves the newest
-      // roll — the reason the panel opened at all — below the fold.
-      await this.#chatSheet.open();
+      // roll — the reason the chat was opened at all — below the fold.
       this.#scrollChatToBottom();
     } catch (err) {
-      Logger.error("Chat panel failed to open", err);
+      Logger.error("Chat screen failed to open", err);
       ui.notifications?.error(`Velvet Mobile: ${err?.message ?? err}`);
       // Hand Foundry's chat log back where it came from before giving up.
-      this.#chatSheet?.destroy();
-      this.#onChatDismissed();
+      await this.closeChat();
     }
   }
 
   /**
-   * Close the chat panel when the user triggers an action from a message,
+   * Close the chat screen when the user triggers an action from a message,
    * clearing the way for the prompt it opens. Reading the log — expanding a
-   * card, following a link, scrolling — leaves the panel alone.
+   * card, following a link, scrolling — leaves the screen alone.
    * @param {MouseEvent} event
    */
   #onChatCardAction(event) {
@@ -1399,34 +1394,20 @@ export class SheetShell {
     setTimeout(() => this.closeChat(), 120);
   }
 
-  closeChat() {
-    this.#cancelChatHide();
-    this.#chatSheet?.dismiss();
-  }
-
-  #scheduleChatHide() {
-    const seconds = Settings.chatAutoHide;
-    if (!seconds) return;
-    this.#cancelChatHide();
-    this.#chatHideTimer = setTimeout(() => {
-      this.#chatHideTimer = null;
-      this.#chatSheet?.dismiss();
-    }, seconds * 1000);
-  }
-
-  #cancelChatHide() {
-    if (this.#chatHideTimer) clearTimeout(this.#chatHideTimer);
-    this.#chatHideTimer = null;
+  async closeChat() {
+    await this.#chatView?.pop();
+    // Nothing on the stack to pop — a failed open, or teardown. Hand the log
+    // back anyway; leaving it in a detached screen loses it from the sidebar.
+    if (this.#chatHome) this.#onChatDismissed();
   }
 
   /** Return the chat log to its original home in the sidebar. */
   #onChatDismissed() {
-    this.#cancelChatHide();
     // Drop the listeners bound to the hosted chat before handing it back.
     this.#chatAbort?.abort();
     this.#chatAbort = null;
-    this.#chatSheet = null;
-    this.#stack?.querySelector('[data-action="chat"]')?.classList.remove("vm-selected");
+    this.#chatView = null;
+    this.#commands?.setActive("chat", false);
     const chat = document.querySelector(".vm-chat-hosted");
     const home = this.#chatHome;
     if (chat && home?.parent) {
@@ -1440,19 +1421,92 @@ export class SheetShell {
 
   /** @param {ChatMessage} message */
   #onChatMessage(message) {
-    if (this.#chatSheet) {
-      if (this.#chatHideTimer) this.#scheduleChatHide();
-      // An open panel does not scroll itself: Foundry appends the message and
+    if (this.#chatView) {
+      // An open screen does not scroll itself: Foundry appends the message and
       // leaves it below the fold, so a roll made with the chat already up was
       // invisible until you scrolled by hand.
       this.#scrollChatToBottom();
       return;
     }
     const mode = Settings.chatOnMessage;
-    const shouldOpen = mode === "all" || (mode === "rolls" && message?.isRoll);
-    // Never steal the screen while the user is typing.
-    if (shouldOpen && !services.keyboard?.isOpen) return void this.openChat(true);
-    this.#chatDot?.removeAttribute("hidden");
+    const shouldAnnounce = mode === "all" || (mode === "rolls" && message?.isRoll);
+    // Never interrupt while the user is typing.
+    if (shouldAnnounce && !services.keyboard?.isOpen) this.#showToast(message);
+    this.#commands?.setBadge("chat", true);
+  }
+
+  /* -- Chat toast ----------------------------------------------------------------- */
+
+  /**
+   * Announce an incoming message without taking the screen.
+   *
+   * The old behaviour pushed the whole chat panel up over whatever you were
+   * doing on every roll, which is far too much interruption for a line of
+   * text. A toast says the same thing in a strip, fades on its own, and opens
+   * the full log if it turns out to be worth reading.
+   * @param {ChatMessage} message
+   */
+  #showToast(message) {
+    this.#dismissToast();
+    const el = VelvetComponent.el;
+
+    // Roll totals are the reason most messages arrive; show the number rather
+    // than the markup that draws it. Everything else falls back to its text.
+    const total = message?.rolls?.[0]?.total;
+    const body = total !== undefined && total !== null
+      ? `${message.flavor || message.alias || ""} ${total}`.trim()
+      : SheetShell.#plainText(message);
+    if (!body) return;
+
+    this.#toast = el("button", {
+      cls: `${CLS}-toast`,
+      attrs: { type: "button" },
+      children: [
+        el("span", { cls: `${CLS}-toast-who`, text: message.alias ?? "" }),
+        el("span", { cls: `${CLS}-toast-body`, text: body })
+      ]
+    });
+    this.#toast.addEventListener("click", () => {
+      this.#dismissToast();
+      this.openChat();
+    });
+    document.body.append(this.#toast);
+
+    // The auto-hide setting keeps its meaning: how long an unattended
+    // announcement stays up. Zero means the user asked for no auto-hide, so
+    // the toast waits for a tap.
+    const seconds = Settings.chatAutoHide;
+    if (seconds === 0) return;
+    this.#toastTimer = setTimeout(() => {
+      this.#toastTimer = null;
+      this.#dismissToast();
+    }, seconds ? seconds * 1000 : TOAST_MS);
+  }
+
+  #dismissToast() {
+    if (this.#toastTimer) clearTimeout(this.#toastTimer);
+    this.#toastTimer = null;
+    const toast = this.#toast;
+    this.#toast = null;
+    if (!toast) return;
+    Motion.fade(toast, 1, 0).then(() => toast.remove());
+  }
+
+  /**
+   * A chat message as a single line of plain text, with Foundry's markup and
+   * any inline roll formatting stripped out.
+   * @param {ChatMessage} message
+   * @returns {string}
+   */
+  static #plainText(message) {
+    const raw = message?.content ?? "";
+    if (!raw) return "";
+    const holder = document.createElement("div");
+    // The content is authored HTML from another user. It is never inserted
+    // into the live document — this element stays detached and only its
+    // textContent is read — so no script in it can run.
+    holder.innerHTML = raw;
+    return (holder.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 140);
   }
 
   /* -- Empty state (no actor) --------------------------------------------------- */
@@ -1480,32 +1534,6 @@ export class SheetShell {
   #hideEmptyState() {
     this.#empty?.remove();
     this.#empty = null;
-  }
-
-  /* -- First-run hint ---------------------------------------------------------- */
-
-  /** Floating "swipe up" pill, shown once per session on the home screen. */
-  #showHintOnce() {
-    if (sessionStorage.getItem(`${MODULE_ID}.hint`) || !this.actor) return;
-    const el = VelvetComponent.el;
-    this.#hint = el("div", {
-      cls: "vm-hint",
-      children: [
-        VelvetComponent.icon("fa-solid fa-chevron-up"),
-        el("span", { text: game.i18n.localize(`${L10N}.Shell.SwipeHint`) })
-      ]
-    });
-    document.body.append(this.#hint);
-    setTimeout(() => this.#dismissHint(), 7000);
-  }
-
-  #dismissHint() {
-    if (!this.#hint) return;
-    sessionStorage.setItem(`${MODULE_ID}.hint`, "1");
-    const hint = this.#hint;
-    this.#hint = null;
-    hint.classList.add("vm-out");
-    setTimeout(() => hint.remove(), 400);
   }
 
   /* -- Helpers -------------------------------------------------------------------- */
@@ -1601,9 +1629,9 @@ export class SheetShell {
    * panel and core's own lookup comes back empty.
    */
   #scrollChatToBottom() {
-    if (!this.#chatSheet) return;
+    if (!this.#chatView) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!this.#chatSheet) return;
+      if (!this.#chatView) return;
       try {
         ui.chat?.scrollBottom?.({ waitImages: false });
       } catch (err) {

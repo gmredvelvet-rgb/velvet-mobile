@@ -214,154 +214,17 @@
    * it is ready (see SheetShell#build). */
 
   /* ------------------------------------------------------------------ *
-   * Avatar carousel (bottom center)
+   * Layout anchors
+   *
+   * The screen is two bars around a stack of views. Everything that floats
+   * (joystick, zoom column, dice bar) hangs off --vm-stack-b so it clears
+   * the command bar at any UI scale.
    * ------------------------------------------------------------------ */
 
-  .vm-carousel {
-    --vm-avatar: clamp(60px, calc((100vw - 180px) * 0.26), 76px);
-    position: fixed;
-    left: 50%;
-    bottom: calc(var(--vm-space-2) + var(--vm-safe-bottom));
-    transform: translateX(-50%);
-    z-index: var(--vm-z-shell);
-    width: clamp(180px, calc(100vw - 160px), 320px);
-    padding: var(--vm-space-2) 0;
-    animation: vm-rise var(--vm-anim-normal) var(--vm-ease) both;
-  }
-
-  .vm-carousel-label {
-    display: block;
-    margin: 0 auto var(--vm-space-1);
-    width: fit-content;
-    max-width: 90%;
-    padding: 2px 12px;
-    border-radius: 999px;
-    background: rgb(0 0 0 / 0.55);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    color: var(--vm-text);
-    font-size: 0.78rem;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: 0;
-    transition: opacity var(--vm-anim-fast) var(--vm-ease);
-  }
-
-  .vm-carousel-label.vm-visible {
-    opacity: 1;
-  }
-
-  .vm-carousel-track {
-    display: flex;
-    align-items: center;
-    gap: var(--vm-space-2);
-    overflow-x: auto;
-    scrollbar-width: none;
-    scroll-snap-type: x proximity;
-    padding: var(--vm-space-1) calc(50% - var(--vm-avatar) / 2);
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-  }
-
-  .vm-carousel-track::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Proximity model (Swipe): --p is 0..1 distance-to-center, set by JS. */
-  .vm-carousel-avatar {
-    --p: 0;
-    position: relative;
-    flex: 0 0 auto;
-    width: var(--vm-avatar);
-    height: var(--vm-avatar);
-    padding: 0;
-    border: 3px solid rgb(255 255 255 / 0.25);
-    border-radius: 50%;
-    background: var(--vm-surface);
-    box-shadow: 0 4px 6px rgb(0 0 0 / 0.5);
-    overflow: hidden;
-    scroll-snap-align: center;
-    opacity: calc(0.55 + var(--p) * 0.45);
-    transform: scale(calc(0.72 + var(--p) * 0.28));
-    filter: saturate(calc(0.3 + var(--p) * 0.7));
-    transition: border-color var(--vm-anim-fast) var(--vm-ease),
-      box-shadow var(--vm-anim-fast) var(--vm-ease);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .vm-carousel-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: top;
-    border: none;
-  }
-
-  .vm-carousel-avatar.vm-selected {
-    border-color: var(--vm-accent);
-    box-shadow: 0 0 14px color-mix(in srgb, var(--vm-accent) 55%, transparent),
-      0 4px 6px rgb(0 0 0 / 0.5);
-  }
-
-  .vm-hp {
-    position: absolute;
-    left: 18%;
-    right: 18%;
-    bottom: 7%;
-    height: 4px;
-    border-radius: 2px;
-    background: rgb(0 0 0 / 0.55);
-    overflow: hidden;
-  }
-
-  .vm-hp-fill {
-    display: block;
-    height: 100%;
-    border-radius: 2px;
-    background: rgb(110 190 80);
-    transition: width var(--vm-anim-normal) var(--vm-ease), background var(--vm-anim-normal) var(--vm-ease);
-  }
-
-  .vm-hp-fill.vm-low {
-    background: rgb(220 165 60);
-  }
-
-  .vm-hp-fill.vm-critical {
-    background: rgb(205 65 60);
-  }
-
-  /* The drawer covers the carousel; the keyboard needs its space. */
-  html[data-vm-drawer] .vm-carousel,
-  html[data-vm-keyboard="open"] .vm-carousel {
-    display: none;
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Floating button stack (bottom right) + dice bar
-   * ------------------------------------------------------------------ */
-
-  /* Anchor shared by the speed-dial and the dice bar. Raised above the
-   * mobile sheet's tab bar while the drawer is open so nothing overlaps. */
   :root {
-    --vm-stack-b: calc(var(--vm-space-4) + var(--vm-safe-bottom));
-  }
-
-  html[data-vm-drawer] {
-    --vm-stack-b: calc(var(--vm-safe-bottom) + 64px * var(--vm-scale));
-  }
-
-  .vm-stack {
-    position: fixed;
-    right: calc(var(--vm-space-3) + var(--vm-safe-right));
-    bottom: var(--vm-stack-b);
-    z-index: calc(var(--vm-z-shell) + 1);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--vm-space-2);
-    animation: vm-rise var(--vm-anim-normal) var(--vm-ease) both;
+    --vm-status-h: calc(54px * var(--vm-scale));
+    --vm-cmd-h: calc(58px * var(--vm-scale));
+    --vm-stack-b: calc(var(--vm-safe-bottom) + var(--vm-cmd-h) + var(--vm-space-3));
   }
 
   @keyframes vm-rise {
@@ -375,98 +238,519 @@
     }
   }
 
-  html[data-vm-keyboard="open"] .vm-stack {
-    display: none;
-  }
+  /* ------------------------------------------------------------------ *
+   * Status bar (top): who you are and how you are doing.
+   * ------------------------------------------------------------------ */
 
-  /* The single small trigger. */
-  .vm-stack-main {
-    position: relative;
-    width: calc(40px * var(--vm-scale));
-    height: calc(40px * var(--vm-scale));
-    display: grid;
-    place-items: center;
-    border: 2px solid rgb(255 255 255 / 0.3);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--vm-surface) 82%, transparent);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    color: var(--vm-text);
-    font-size: 1rem;
-    box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .vm-stack-main .vm-icon {
-    transition: rotate var(--vm-anim-fast) var(--vm-ease);
-  }
-
-  .vm-stack.vm-open .vm-stack-main {
-    border-color: var(--vm-accent);
-    color: var(--vm-accent);
-  }
-
-  .vm-stack.vm-open .vm-stack-main .vm-icon {
-    rotate: 45deg;
-  }
-
-  /* The fan-out actions. */
-  .vm-stack-dial {
-    display: none;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--vm-space-2);
-  }
-
-  .vm-stack.vm-open .vm-stack-dial {
-    display: flex;
-    animation: vm-rise var(--vm-anim-fast) var(--vm-ease) both;
-  }
-
-  .vm-stack-btn {
-    position: relative;
-    width: calc(46px * var(--vm-scale));
-    height: calc(46px * var(--vm-scale));
-    display: grid;
-    place-items: center;
-    border: 2px solid rgb(255 255 255 / 0.25);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--vm-surface) 80%, transparent);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    color: var(--vm-text);
-    font-size: 1.1rem;
-    box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
-    transition: transform var(--vm-anim-fast) var(--vm-ease), background var(--vm-anim-fast) var(--vm-ease);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .vm-stack-btn:active {
-    transform: scale(0.95);
-  }
-
-  .vm-stack-btn.vm-selected {
-    border-color: var(--vm-accent);
-    color: var(--vm-accent);
-  }
-
-  .vm-stack-dot {
-    position: absolute;
+  .vm-status {
+    position: fixed;
     top: 0;
+    left: 0;
     right: 0;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--vm-accent);
-    border: 2px solid rgb(0 0 0 / 0.6);
+    z-index: calc(var(--vm-z-sheet) + 5);
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    height: calc(var(--vm-status-h) + var(--vm-safe-top));
+    padding: var(--vm-safe-top) calc(var(--vm-space-2) + var(--vm-safe-right)) 0
+      calc(var(--vm-space-2) + var(--vm-safe-left));
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.45) 70%, transparent 100%);
+    color: var(--vm-text);
+    transition: translate var(--vm-anim-normal) var(--vm-ease);
   }
 
-  .vm-stack-dot[hidden] {
+  /* A stack view draws its own title bar, and repeating the portrait and hit
+   * points directly above the sheet's own header reads as a duplicate. */
+  html[data-vm-drawer] .vm-status,
+  html[data-vm-keyboard="open"] .vm-status {
     display: none;
+  }
+
+  /* Driving the token: hand the screen to the map. */
+  .vm-status.vm-hidden {
+    translate: 0 -100%;
+  }
+
+  .vm-status-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-status-portrait {
+    flex: 0 0 auto;
+    width: calc(38px * var(--vm-scale));
+    height: calc(38px * var(--vm-scale));
+    object-fit: cover;
+    object-position: top;
+    border: 2px solid rgb(255 255 255 / 0.3);
+    border-radius: var(--vm-radius-md);
+    background: var(--vm-surface);
+  }
+
+  .vm-status-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .vm-status-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
+  }
+
+  .vm-status-hp {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 12px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 0.55);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    overflow: hidden;
+  }
+
+  .vm-status-hp[hidden] {
+    display: none;
+  }
+
+  .vm-status-hp-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 6px 0 0 6px;
+    background: rgb(110 190 80);
+    transition: width var(--vm-anim-normal) var(--vm-ease), background var(--vm-anim-normal) var(--vm-ease);
+  }
+
+  .vm-status-hp-fill.vm-low {
+    background: rgb(220 165 60);
+  }
+
+  .vm-status-hp-fill.vm-critical {
+    background: rgb(205 65 60);
+  }
+
+  .vm-status-hp-text {
+    position: relative;
+    width: 100%;
+    padding: 0 var(--vm-space-2);
+    font-size: 0.64rem;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.9);
+  }
+
+  .vm-status-tools {
+    flex: 0 0 auto;
+    display: flex;
+    gap: var(--vm-space-1);
+  }
+
+  .vm-status-btn {
+    display: grid;
+    place-items: center;
+    width: var(--vm-touch-target);
+    height: var(--vm-touch-target);
+    border: none;
+    border-radius: var(--vm-radius-md);
+    background: rgb(0 0 0 / 0.3);
+    color: var(--vm-text);
+    font-size: 0.95rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-status-btn:active {
+    color: var(--vm-accent);
+  }
+
+  /* No character to show: the tools still work, the identity block does not. */
+  .vm-status.vm-empty .vm-status-id {
+    opacity: 0.5;
+    pointer-events: none;
   }
 
   /* ------------------------------------------------------------------ *
-   * Token movement joystick (bottom-left, toggled from the speed-dial)
+   * Navigation stack: every screen that covers the home view.
+   *
+   * Views enter from the right and the one below parallaxes back, so the
+   * hierarchy is legible in the motion itself. Transform-only: pushing a
+   * view never re-layouts the one underneath.
+   * ------------------------------------------------------------------ */
+
+  .vm-nav {
+    position: fixed;
+    inset: 0;
+    z-index: var(--vm-z-sheet);
+    pointer-events: none;
+  }
+
+  .vm-nav-view {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--vm-surface-sunken);
+    color: var(--vm-text);
+    pointer-events: auto;
+    touch-action: pan-y;
+    will-change: transform;
+    overscroll-behavior: contain;
+  }
+
+  /* Covered by another view: pushed back and dimmed, never interactive. */
+  .vm-nav-view.vm-under {
+    filter: brightness(0.55);
+  }
+
+  .vm-nav-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-height: var(--vm-touch-target);
+    padding: calc(var(--vm-safe-top) + var(--vm-space-1)) var(--vm-space-2) var(--vm-space-2);
+    border-bottom: 1px solid var(--vm-surface-border);
+    background: rgb(0 0 0 / 0.25);
+  }
+
+  .vm-nav-back {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: var(--vm-touch-target);
+    height: var(--vm-touch-target);
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--vm-text);
+    font-size: 1.05rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-nav-back:active {
+    color: var(--vm-accent);
+  }
+
+  .vm-nav-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-nav-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: var(--vm-space-1);
+  }
+
+  .vm-nav-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    /* Clear of the command bar, which floats above every view. */
+    padding-bottom: calc(var(--vm-safe-bottom) + var(--vm-cmd-h) + var(--vm-space-2));
+  }
+
+  /* The sheet supplies its own header and tab bar; it fills the view whole. */
+  .vm-sheet-view .vm-nav-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Roster: pick a character.
+   * ------------------------------------------------------------------ */
+
+  .vm-roster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--vm-space-3);
+    padding: var(--vm-space-3);
+  }
+
+  .vm-roster-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vm-space-2);
+    padding: var(--vm-space-2);
+    border: 2px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-lg);
+    background: var(--vm-surface-raised);
+    color: var(--vm-text);
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-roster-card:active {
+    border-color: var(--vm-accent);
+  }
+
+  .vm-roster-card.vm-selected {
+    border-color: var(--vm-accent);
+    box-shadow: 0 0 0 1px var(--vm-accent) inset;
+  }
+
+  .vm-roster-portrait {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    object-position: top;
+    border: none;
+    border-radius: var(--vm-radius-md);
+    background: rgb(0 0 0 / 0.4);
+  }
+
+  .vm-roster-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-roster-hp {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 14px;
+    border-radius: 7px;
+    background: rgb(0 0 0 / 0.55);
+    overflow: hidden;
+  }
+
+  .vm-roster-hp-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: rgb(110 190 80);
+    transition: width var(--vm-anim-normal) var(--vm-ease), background var(--vm-anim-normal) var(--vm-ease);
+  }
+
+  .vm-roster-hp-fill.vm-low {
+    background: rgb(220 165 60);
+  }
+
+  .vm-roster-hp-fill.vm-critical {
+    background: rgb(205 65 60);
+  }
+
+  .vm-roster-hp-text {
+    position: relative;
+    width: 100%;
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.9);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Command bar (bottom): the actions of play, one tap each.
+   * ------------------------------------------------------------------ */
+
+  .vm-cmd {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--vm-z-sheet) + 5);
+    display: flex;
+    align-items: stretch;
+    height: calc(var(--vm-cmd-h) + var(--vm-safe-bottom));
+    padding: 0 var(--vm-safe-right) var(--vm-safe-bottom) var(--vm-safe-left);
+    border-top: 1px solid var(--vm-surface-border);
+    background: color-mix(in srgb, var(--vm-surface) 92%, transparent);
+    -webkit-backdrop-filter: blur(var(--vm-blur));
+    backdrop-filter: blur(var(--vm-blur));
+    box-shadow: 0 -4px 20px rgb(0 0 0 / 0.45);
+    transition: translate var(--vm-anim-normal) var(--vm-ease);
+  }
+
+  /* The keyboard needs every pixel, and the bar would sit on top of it. */
+  html[data-vm-keyboard="open"] .vm-cmd {
+    display: none;
+  }
+
+  .vm-cmd-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 2px;
+    border: none;
+    background: none;
+    color: var(--vm-text-dim);
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-cmd-btn:active {
+    background: rgb(255 255 255 / 0.06);
+  }
+
+  .vm-cmd-btn.vm-active {
+    color: var(--vm-accent);
+  }
+
+  .vm-cmd-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .vm-cmd-label {
+    font-size: 0.62rem;
+    line-height: 1;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-cmd-dot {
+    position: absolute;
+    top: -3px;
+    right: -6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--vm-accent);
+    border: 2px solid var(--vm-surface);
+  }
+
+  .vm-cmd-dot[hidden] {
+    display: none;
+  }
+
+  /* Overflow menu: everything past the fifth slot. */
+  .vm-cmd-overflow {
+    position: absolute;
+    right: calc(var(--vm-space-2) + var(--vm-safe-right));
+    bottom: calc(100% + var(--vm-space-1));
+    min-width: 180px;
+    padding: var(--vm-space-1);
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-lg);
+    background: var(--vm-surface-raised);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.6);
+    transform-origin: bottom right;
+    animation: vm-pop var(--vm-anim-fast) var(--vm-ease) both;
+  }
+
+  .vm-cmd-row {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-3);
+    width: 100%;
+    min-height: var(--vm-touch-target);
+    padding: 0 var(--vm-space-3);
+    border: none;
+    border-radius: var(--vm-radius-md);
+    background: none;
+    color: var(--vm-text);
+    font-size: 0.9rem;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-cmd-row:active {
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  .vm-cmd-row.vm-active {
+    color: var(--vm-accent);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Chat toast: an incoming message announces itself without taking over.
+   * ------------------------------------------------------------------ */
+
+  .vm-toast {
+    position: fixed;
+    left: calc(var(--vm-space-3) + var(--vm-safe-left));
+    right: calc(var(--vm-space-3) + var(--vm-safe-right));
+    top: calc(var(--vm-safe-top) + var(--vm-status-h) + var(--vm-space-1));
+    z-index: calc(var(--vm-z-sheet) + 6);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: var(--vm-space-2) var(--vm-space-3);
+    border: 1px solid var(--vm-surface-border);
+    border-left: 3px solid var(--vm-accent);
+    border-radius: var(--vm-radius-md);
+    background: color-mix(in srgb, var(--vm-surface-raised) 94%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 6px 22px rgb(0 0 0 / 0.55);
+    color: var(--vm-text);
+    text-align: left;
+    animation: vm-rise var(--vm-anim-fast) var(--vm-ease) both;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* A stack view covers the status bar, so the toast takes its place. */
+  html[data-vm-drawer] .vm-toast {
+    top: calc(var(--vm-safe-top) + var(--vm-space-2));
+  }
+
+  .vm-toast-who {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--vm-accent);
+  }
+
+  .vm-toast-who:empty {
+    display: none;
+  }
+
+  .vm-toast-body {
+    font-size: 0.85rem;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Token movement joystick (bottom-left, toggled from the command bar)
    * ------------------------------------------------------------------ */
 
   .vm-joystick {
@@ -515,6 +799,34 @@
 
   .vm-zoom-btn:active {
     transform: scale(0.95);
+    color: var(--vm-accent);
+  }
+
+  /* Movement mode's own way out, on the rim of the stick where the thumb
+   * already is. The command bar toggles it too; this is the near one. */
+  .vm-joy-close {
+    position: absolute;
+    top: calc(-6px * var(--vm-scale));
+    right: calc(-6px * var(--vm-scale));
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: calc(34px * var(--vm-scale));
+    height: calc(34px * var(--vm-scale));
+    padding: 0;
+    border: 2px solid rgb(255 255 255 / 0.3);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--vm-surface) 92%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--vm-text);
+    font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.6);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-joy-close:active {
+    border-color: var(--vm-accent);
     color: var(--vm-accent);
   }
 
@@ -697,46 +1009,14 @@
     overscroll-behavior: contain;
   }
 
-  .vm-drawer-handle {
-    position: absolute;
+  /* The back bar injected into a pinned Foundry sheet. It reuses the stack's
+   * own nav-bar classes so the fallback presentation looks and behaves like
+   * every screen we draw ourselves, despite living outside the stack. */
+  html[data-vm-sheet-only] .vm-pinned > .vm-pinned-bar {
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
     z-index: 20;
-    display: grid;
-    place-items: center;
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .vm-drawer-close {
-    position: absolute;
-    top: calc(var(--vm-safe-top) + 2px);
-    right: var(--vm-space-2);
-    width: 38px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: none;
-    border-radius: var(--vm-radius-md);
-    background: rgb(0 0 0 / 0.35);
-    color: rgb(255 255 255 / 0.75);
-    font-size: 0.9rem;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .vm-drawer-close:active {
-    color: var(--vm-accent);
-  }
-
-  .vm-drawer-grip {
-    width: 44px;
-    height: 5px;
-    border-radius: 3px;
-    background: rgb(255 255 255 / 0.45);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+    margin: calc(-1 * max(var(--vm-safe-top), 4px)) 0 0;
   }
 
   /* ------------------------------------------------------------------ *
@@ -795,14 +1075,22 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Chat hosted inside the bottom sheet
+   * Foundry's chat log, hosted inside a stack view
+   *
+   * The BottomSheet selectors are kept alongside: that component is part of
+   * the public API (game.modules.get("velvet-mobile").api), so a module
+   * hosting the log in one still gets a working layout.
    * ------------------------------------------------------------------ */
 
-  .vm-chat-panel .vm-sheet-body {
+  .vm-chat .vm-nav-body {
     display: flex;
     flex-direction: column;
+    /* The log manages its own scrolling; a second scroller fights it. */
+    overflow: hidden;
+    padding-bottom: 0;
   }
 
+  .vm-nav-body .vm-chat-hosted,
   .vm-sheet-body .vm-chat-hosted {
     display: flex !important;
     flex-direction: column;
@@ -811,8 +1099,13 @@
     width: 100%;
     height: 100%;
     max-height: none;
+    /* Clear of the command bar, which floats above every view. */
+    padding-bottom: calc(var(--vm-safe-bottom) + var(--vm-cmd-h));
   }
 
+  .vm-nav-body .vm-chat-hosted #chat-log,
+  .vm-nav-body .vm-chat-hosted .chat-log,
+  .vm-nav-body .vm-chat-hosted .chat-scroll,
   .vm-sheet-body .vm-chat-hosted #chat-log,
   .vm-sheet-body .vm-chat-hosted .chat-log,
   .vm-sheet-body .vm-chat-hosted .chat-scroll {
@@ -822,6 +1115,8 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .vm-nav-body .vm-chat-hosted textarea,
+  .vm-nav-body .vm-chat-hosted input,
   .vm-sheet-body .vm-chat-hosted textarea,
   .vm-sheet-body .vm-chat-hosted input {
     font-size: max(var(--vm-font-min), 1em);
@@ -833,223 +1128,107 @@
    * Drawn by us from game.combat rather than borrowed from the sidebar:
    * Foundry's tracker takes its height and scrolling from sidebar-scoped
    * rules and collapses once moved out of it.
+   *
+   * Full-width rows: with the round in the title bar there is room to show
+   * each combatant's name outright, rather than hiding it in a tooltip that
+   * a touch device has no way to open.
    * ------------------------------------------------------------------ */
 
-  /* Sizes are pinned with !important throughout: the module lives in a CSS
+  /* Portrait sizes are pinned with !important: the module lives in a CSS
    * layer and therefore loses to any unlayered rule another module ships,
    * which is exactly what blew the portraits up to full size. Losing the
    * cascade on someone else's element is good citizenship; losing it on our
    * own overlay is a bug. */
 
-  .vm-combat-rail {
-    --vm-combat-size: calc(46px * var(--vm-scale));
-    /* How far the badge and the active ring bleed past the chip's circle. */
-    --vm-combat-bleed: 4px;
-
-    position: fixed;
-    top: calc(var(--vm-safe-top) + var(--vm-space-4));
-    right: calc(var(--vm-space-2) + var(--vm-safe-right));
-    /* Stops short of the speed-dial so the two never fight for the corner. */
-    bottom: calc(var(--vm-stack-b) + 72px * var(--vm-scale));
-    z-index: calc(var(--vm-z-shell) + 1);
+  .vm-combat-row {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: var(--vm-space-2);
-    padding: var(--vm-space-2);
-    /* Fully rounded ends: a capsule reads as a deliberate rail rather than
-       a cropped panel, and matches the circular chips inside it. */
-    border-radius: 999px;
-    /* Frosted rather than opaque, so the sheet stays readable underneath. */
-    background: color-mix(in srgb, var(--vm-surface) 80%, transparent);
-    backdrop-filter: blur(var(--vm-blur)) saturate(140%);
-    -webkit-backdrop-filter: blur(var(--vm-blur)) saturate(140%);
-    border: 1px solid var(--vm-surface-border);
-    box-shadow: var(--vm-shadow-side);
-    overflow: hidden;
-  }
-
-  /* Head is pinned; only the turn list scrolls. */
-  .vm-combat-head {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--vm-space-2);
-  }
-
-  /* Ghost button: present but quiet, so it never competes with the turn it
-     sits above. Fills in only while pressed. */
-  .vm-combat-close {
-    display: grid;
-    place-items: center;
-    width: calc(var(--vm-combat-size) * 0.58) !important;
-    height: calc(var(--vm-combat-size) * 0.58) !important;
-    padding: 0 !important;
-    border: 1px solid var(--vm-surface-border);
-    border-radius: 50%;
+    gap: var(--vm-space-3);
+    width: 100%;
+    min-height: calc(var(--vm-touch-target) + 10px);
+    padding: var(--vm-space-1) var(--vm-space-4);
+    border: none;
+    border-bottom: 1px solid var(--vm-hairline);
+    border-left: 4px solid transparent;
     background: transparent;
-    color: var(--vm-text-dim);
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background var(--vm-anim-fast) var(--vm-ease),
-                color var(--vm-anim-fast) var(--vm-ease);
-  }
-
-  .vm-combat-close:active {
-    background: var(--vm-surface-raised);
     color: var(--vm-text);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .vm-combat-round {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: calc(var(--vm-combat-size) * 0.92);
-    padding: var(--vm-space-1) var(--vm-space-1) calc(var(--vm-space-1) - 1px);
-    border-radius: var(--vm-radius-md);
-    background: color-mix(in srgb, var(--vm-accent) 16%, transparent);
-    border: 1px solid color-mix(in srgb, var(--vm-accent) 34%, transparent);
-    line-height: 1;
-  }
-
-  .vm-combat-round-label {
-    color: var(--vm-text-dim);
-    font-size: 0.5rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .vm-combat-round-value {
-    margin-top: 2px;
-    color: var(--vm-text);
-    font-size: 0.95rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .vm-combat-list {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--vm-space-2);
-    /* Side padding leaves room for the initiative badge and the active ring,
-       which both sit slightly outside the chip — a scroll container would
-       otherwise clip them or grow a horizontal scrollbar. */
-    padding: var(--vm-space-2) var(--vm-combat-bleed) 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    /* Softens both ends instead of cutting portraits off flat, which is the
-       cue that the list keeps going. */
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--vm-space-3),
-      #000 calc(100% - var(--vm-space-3)), transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--vm-space-3),
-      #000 calc(100% - var(--vm-space-3)), transparent 100%);
-  }
-
-  .vm-combat-list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .vm-combat-chip {
-    position: relative;
-    flex: 0 0 auto;
-    width: var(--vm-combat-size) !important;
-    height: var(--vm-combat-size) !important;
-    padding: 0 !important;
-    border: 2px solid var(--vm-surface-border);
-    border-radius: 50%;
-    background: var(--vm-surface-raised);
-    cursor: pointer;
-    transition: transform var(--vm-anim-fast) var(--vm-ease),
-                border-color var(--vm-anim-fast) var(--vm-ease);
-  }
-
-  /* The thread between portraits is what turns a stack of faces into an
-     order you can read top to bottom. */
-  .vm-combat-chip + .vm-combat-chip::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 100%;
-    width: 2px;
-    height: var(--vm-space-2);
-    background: var(--vm-surface-border);
-    transform: translateX(-50%);
-  }
-
-  .vm-combat-chip:active {
-    transform: scale(0.92);
+  .vm-combat-row:active {
+    background: rgb(255 255 255 / 0.06);
   }
 
   .vm-combat-portrait {
-    display: block !important;
-    width: 100% !important;
-    height: 100% !important;
+    flex: 0 0 auto;
+    width: calc(40px * var(--vm-scale)) !important;
+    height: calc(40px * var(--vm-scale)) !important;
     max-width: none !important;
-    border: none !important;
-    border-radius: 50%;
-    object-fit: cover;
+    max-height: none !important;
+    object-fit: cover !important;
+    object-position: top;
+    border: 1px solid var(--vm-surface-border) !important;
+    border-radius: 50% !important;
+    background: rgb(0 0 0 / 0.4);
+  }
+
+  .vm-combat-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .vm-combat-init {
-    position: absolute;
-    right: calc(var(--vm-combat-bleed) * -1);
-    bottom: calc(var(--vm-combat-bleed) * -1);
-    min-width: 1.6em;
-    padding: 1px 3px;
-    border-radius: var(--vm-radius-sm);
-    background: var(--vm-surface);
+    flex: 0 0 auto;
+    min-width: 2.5ch;
+    padding: 2px 8px;
     border: 1px solid var(--vm-surface-border);
-    color: var(--vm-text);
-    font-size: 0.66rem;
+    border-radius: var(--vm-radius-pill);
+    background: var(--vm-surface-raised);
+    font-size: 0.8rem;
     font-weight: 700;
-    line-height: 1.3;
     font-variant-numeric: tabular-nums;
+    text-align: center;
   }
 
-  /* Whose turn it is has to read at a glance, mid-fight and at arm's length:
-     bigger, ringed and lit, so it wins without any label. */
+  /* Whose turn it is — the one thing this screen exists to answer. */
   .vm-combat-active {
-    border-color: var(--vm-accent);
-    transform: scale(1.08);
-    box-shadow:
-      0 0 0 var(--vm-combat-bleed) color-mix(in srgb, var(--vm-accent) 28%, transparent),
-      0 0 16px color-mix(in srgb, var(--vm-accent) 55%, transparent);
+    border-left-color: var(--vm-accent);
+    background: color-mix(in srgb, var(--vm-accent) 16%, transparent);
   }
 
-  .vm-combat-active:active {
-    transform: scale(1);
+  .vm-combat-active .vm-combat-name {
+    font-weight: 700;
   }
 
   .vm-combat-active .vm-combat-init {
+    border-color: var(--vm-accent);
     background: var(--vm-accent);
-    border-color: color-mix(in srgb, var(--vm-accent) 60%, #fff);
     color: #fff;
   }
 
   .vm-combat-defeated {
-    border-color: transparent;
+    opacity: 0.5;
   }
 
   .vm-combat-defeated .vm-combat-portrait {
     filter: grayscale(1);
-    opacity: 0.4;
   }
 
-  .vm-combat-defeated .vm-combat-init {
-    color: var(--vm-text-dim);
+  .vm-combat-defeated .vm-combat-name {
+    text-decoration: line-through;
   }
 
-  /* Hidden combatants only ever reach a GM; mark them without hiding them. */
   .vm-combat-hidden {
     opacity: 0.6;
-    border-style: dashed;
+  }
+
+  .vm-combat-hidden .vm-combat-portrait {
+    border-style: dashed !important;
   }
 
   /* ------------------------------------------------------------------ *
@@ -1064,7 +1243,7 @@
     min-height: calc(var(--vm-touch-target) + 8px);
     padding: var(--vm-space-1) var(--vm-space-4);
     border: none;
-    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-bottom: 1px solid var(--vm-hairline);
     border-left: 4px solid transparent;
     background: transparent;
     color: var(--vm-text);
@@ -1127,50 +1306,6 @@
     text-align: center;
   }
 
-  /* ------------------------------------------------------------------ *
-   * First-run hint pill
-   * ------------------------------------------------------------------ */
-
-  .vm-hint {
-    position: fixed;
-    left: 50%;
-    bottom: calc(120px + var(--vm-safe-bottom));
-    transform: translateX(-50%);
-    z-index: var(--vm-z-shell);
-    display: flex;
-    align-items: center;
-    gap: var(--vm-space-2);
-    padding: var(--vm-space-2) var(--vm-space-4);
-    border: 1px solid rgb(255 255 255 / 0.15);
-    border-radius: 999px;
-    background: rgb(0 0 0 / 0.6);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    color: var(--vm-text);
-    font-size: 0.82rem;
-    white-space: nowrap;
-    pointer-events: none;
-    transition: opacity 0.4s var(--vm-ease);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .vm-hint {
-      animation: vm-float 2.2s ease-in-out infinite;
-    }
-  }
-
-  .vm-hint .vm-icon {
-    color: var(--vm-accent);
-  }
-
-  .vm-hint.vm-out {
-    opacity: 0;
-  }
-
-  @keyframes vm-float {
-    0%, 100% { translate: 0 0; }
-    50% { translate: 0 -6px; }
-  }
 
   /* ------------------------------------------------------------------ *
    * Empty state (no actor available)
@@ -1224,7 +1359,7 @@
     z-index: 60; /* above the sheet drawer and the chat panel */
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgb(28 26 34) 0%, rgb(18 17 22) 30%);
+    background: var(--vm-surface-sunken);
     color: var(--vm-text);
     padding-top: var(--vm-safe-top);
     will-change: transform;
@@ -1315,7 +1450,7 @@
     min-height: var(--vm-touch-target);
     padding: var(--vm-space-2) 0;
     border: none;
-    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-bottom: 1px solid var(--vm-hairline);
     background: none;
     color: var(--vm-text);
     text-align: left;
@@ -1334,7 +1469,7 @@
   .vm-set-cat-count {
     padding: 1px 8px;
     border: 1px solid var(--vm-surface-border);
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: var(--vm-surface-raised);
     font-size: 0.72rem;
     color: var(--vm-text-dim);
@@ -1347,7 +1482,7 @@
     margin: var(--vm-space-3) 0 var(--vm-space-2);
     padding: var(--vm-space-1) 0;
     border: none;
-    background: rgb(19 18 23 / 0.95);
+    background: var(--vm-sticky-bg);
     font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1361,7 +1496,7 @@
     align-items: center;
     gap: var(--vm-space-3);
     padding: var(--vm-space-3) 0;
-    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-bottom: 1px solid var(--vm-hairline);
   }
 
   /* Controls that need the width get their own line under the label. */
@@ -1395,7 +1530,7 @@
     align-self: flex-start;
     margin-top: var(--vm-space-1);
     padding: 1px 7px;
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: rgb(176 106 179 / 0.22);
     border: 1px solid var(--vm-accent);
     font-size: 0.65rem;
@@ -1418,7 +1553,7 @@
     height: 28px;
     padding: 0;
     border: 1px solid var(--vm-surface-border);
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: rgb(255 255 255 / 0.08);
     transition: background var(--vm-anim-fast) var(--vm-ease);
     -webkit-tap-highlight-color: transparent;

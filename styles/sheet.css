@@ -1,60 +1,28 @@
 /**
  * Velvet Mobile — native mobile sheet styles.
- * The fullscreen drawer the MobileSheet component renders: header with
- * portrait/HP/AC, scrolling tab content, bottom tab bar. Phone-first,
+ *
+ * The MobileSheet fills a NavStack view: header with back chevron, portrait,
+ * HP and AC; a segmented tab bar; then the scrolling tab content. Phone-first,
  * safe-area aware, dark chrome with the velvet accent.
+ *
+ * The tab bar sits above the content, not below it: the bottom of the screen
+ * belongs to the shell's command bar, and two stacked rows of buttons down
+ * there would leave the player guessing which one they were tapping.
+ *
+ * Presentation — entering, leaving, the back drag — belongs to the NavStack
+ * view hosting this sheet, so nothing here positions or animates itself.
  */
 
 @layer velvet-mobile.sheet {
   .vm-msheet {
-    position: fixed;
-    inset: 0;
-    z-index: 20; /* above the home screen; stack, chat and Foundry windows sit above */
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgb(28 26 34) 0%, rgb(18 17 22) 30%);
     color: var(--vm-text);
+    /* The hosting view draws no nav bar of its own, so the notch is ours. */
     padding-top: var(--vm-safe-top);
-    will-change: transform;
     overscroll-behavior: contain;
-  }
-
-  /* ------------------------------------------------------------------ *
-   * Handle
-   * ------------------------------------------------------------------ */
-
-  .vm-ms-handle {
-    flex: 0 0 auto;
-    position: relative;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .vm-ms-grip {
-    width: 44px;
-    height: 5px;
-    border-radius: 3px;
-    background: rgb(255 255 255 / 0.35);
-  }
-
-  .vm-ms-close {
-    position: absolute;
-    top: 0;
-    right: var(--vm-space-2);
-    width: 40px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: none;
-    border-radius: var(--vm-radius-md);
-    background: transparent;
-    color: rgb(255 255 255 / 0.6);
-    font-size: 0.9rem;
-    -webkit-tap-highlight-color: transparent;
   }
 
   /* ------------------------------------------------------------------ *
@@ -63,21 +31,24 @@
 
   .vm-ms-header {
     flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      "portrait title"
-      "portrait stats"
-      "hp hp";
-    gap: var(--vm-space-1) var(--vm-space-3);
-    padding: var(--vm-space-1) var(--vm-space-4) var(--vm-space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--vm-space-2);
+    padding: var(--vm-space-1) var(--vm-space-3) var(--vm-space-2);
     border-bottom: 1px solid var(--vm-surface-border);
   }
 
+  .vm-ms-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-width: 0;
+  }
+
   .vm-ms-portrait {
-    grid-area: portrait;
-    width: calc(64px * var(--vm-scale));
-    height: calc(64px * var(--vm-scale));
+    flex: 0 0 auto;
+    width: calc(56px * var(--vm-scale));
+    height: calc(56px * var(--vm-scale));
     object-fit: cover;
     object-position: top;
     border: 2px solid var(--vm-accent);
@@ -86,7 +57,7 @@
   }
 
   .vm-ms-title {
-    grid-area: title;
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -113,12 +84,15 @@
   }
 
   .vm-ms-stats {
-    grid-area: stats;
     display: flex;
     align-items: center;
     gap: var(--vm-space-2);
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .vm-ms-stats::-webkit-scrollbar {
+    display: none;
   }
 
   .vm-ms-stat {
@@ -130,7 +104,7 @@
     padding: 2px 8px;
     border: 1px solid var(--vm-surface-border);
     border-radius: var(--vm-radius-sm);
-    background: rgb(255 255 255 / 0.04);
+    background: var(--vm-surface-card);
     color: var(--vm-text);
     -webkit-tap-highlight-color: transparent;
   }
@@ -158,10 +132,8 @@
   }
 
   .vm-ms-hp {
-    grid-area: hp;
     position: relative;
     height: 26px;
-    margin-top: var(--vm-space-1);
     padding: 0;
     border: 1px solid var(--vm-surface-border);
     border-radius: var(--vm-radius-sm);
@@ -253,8 +225,10 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    /* Centered reading column on tablets; edge-to-edge on phones. */
-    padding: var(--vm-space-2) max(var(--vm-space-3), calc((100vw - 760px) / 2)) var(--vm-space-6);
+    /* Centered reading column on tablets; edge-to-edge on phones. The bottom
+     * clears the command bar, which floats above every view. */
+    padding: var(--vm-space-2) max(var(--vm-space-3), calc((100vw - 760px) / 2))
+      calc(var(--vm-safe-bottom) + var(--vm-cmd-h) + var(--vm-space-4));
   }
 
   .vm-ms-section {
@@ -270,22 +244,24 @@
     gap: var(--vm-space-2);
     margin: var(--vm-space-3) 0 var(--vm-space-2);
     padding: var(--vm-space-1) 0;
-    background: rgb(19 18 23 / 0.95);
+    background: var(--vm-sticky-bg);
   }
 
   .vm-ms-section-head h2 {
     margin: 0;
     border: none;
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: var(--vm-text-dim);
+    line-height: 1.1;
+    overflow-wrap: anywhere;
   }
 
   .vm-ms-section-badge {
     padding: 1px 8px;
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: var(--vm-surface-raised);
     border: 1px solid var(--vm-surface-border);
     font-size: 0.72rem;
@@ -315,7 +291,7 @@
     padding: var(--vm-space-2) 0;
     border: 1px solid var(--vm-surface-border);
     border-radius: var(--vm-radius-sm);
-    background: rgb(255 255 255 / 0.04);
+    background: var(--vm-surface-card);
     color: var(--vm-text);
     -webkit-tap-highlight-color: transparent;
   }
@@ -355,8 +331,8 @@
     align-items: stretch;
     overflow: hidden;
     border: 1px solid var(--vm-surface-border);
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.04);
+    border-radius: var(--vm-radius-pill);
+    background: var(--vm-surface-card);
   }
 
   /* `display` on a class beats the UA's `[hidden] { display: none }`, so the
@@ -414,7 +390,7 @@
   .vm-ms-condition-value {
     min-width: 18px;
     padding: 2px 5px;
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: var(--vm-accent);
     color: rgb(255 255 255);
     font-size: 0.7rem;
@@ -445,7 +421,7 @@
     min-height: 34px;
     padding: 0 var(--vm-space-3);
     border: 1px dashed var(--vm-surface-border);
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: none;
     color: var(--vm-text-dim);
     font-size: 0.75rem;
@@ -463,9 +439,11 @@
 
   /* Rows */
   .vm-ms-row {
-    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-bottom: 1px solid var(--vm-hairline);
   }
 
+  /* Kept for anything outside the renderers that still builds a bare row;
+     the renderers themselves compose through .vm-sys-line. */
   .vm-ms-row-line {
     display: flex;
     align-items: stretch;
@@ -522,7 +500,15 @@
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--vm-space-2);
+  }
+
+  .vm-ms-row-label,
+  .vm-ms-row-sub {
+    min-width: 0;
   }
 
   .vm-ms-row-label {
@@ -543,7 +529,7 @@
   .vm-ms-row-badge {
     flex: 0 0 auto;
     padding: 1px 8px;
-    border-radius: 999px;
+    border-radius: var(--vm-radius-pill);
     background: var(--vm-surface-raised);
     border: 1px solid var(--vm-surface-border);
     font-size: 0.8rem;
@@ -560,6 +546,10 @@
     color: var(--vm-text-dim);
     font-size: 0.95rem;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .vm-ms-row-action-label {
+    display: none !important;
   }
 
   .vm-ms-row-action:active {
@@ -590,44 +580,409 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Tab bar
+   * System-aware row compositions
+   *
+   * These classes are emitted by sheet/system-renderers.mjs. They keep the
+   * adapter model shared while letting each system draw the same logical row
+   * with a different hierarchy.
+   * ------------------------------------------------------------------ */
+
+  .vm-sys-row {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) {
+    border-bottom: 0;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) .vm-ms-row-main {
+    width: auto;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0;
+    flex: 1 1 auto;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) .vm-ms-row-img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) .vm-ms-row-label {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.9rem;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) .vm-ms-row-sub {
+    display: none;
+  }
+
+  .vm-sys-row:not(.vm-sys-row-default) .vm-ms-row-badge {
+    display: none;
+  }
+
+  .vm-sys-kicker,
+  .vm-sys-status,
+  .vm-sys-meta,
+  .vm-sys-trait,
+  .vm-sys-badge {
+    font-size: 0.66rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: var(--vm-title-spacing);
+  }
+
+  .vm-sys-badge,
+  .vm-sys-meta,
+  .vm-sys-trait {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 7px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-pill);
+    background: var(--vm-surface-card);
+    color: var(--vm-text);
+  }
+
+  .vm-sys-meta-row,
+  .vm-sys-traits,
+  .vm-sys-subline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vm-space-1);
+  }
+
+  .vm-sys-subline {
+    display: block;
+    color: var(--vm-text-dim);
+    font-size: 0.72rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The row line, shared by every system renderer
+   *
+   * Content on the left, actions pinned right. The actions never shrink:
+   * these rows are `nowrap` with hidden overflow so a long item name cannot
+   * wrap, and a shrinkable action column is a column that quietly collapses
+   * to nothing behind a long name. Left as a flex default it did exactly
+   * that, which is why the buttons went missing on the longer entries.
+   * ------------------------------------------------------------------ */
+
+  .vm-sys-line {
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    min-width: 0;
+  }
+
+  /* The official PF2e action iconography.
+   *
+   * The system self-hosts "Pathfinder2eActions", where "1"/"2"/"3" draw the
+   * action pips, "R" the reaction arrow and "F" the free-action diamond. We
+   * emit those characters (see costGlyph in adapters/pf2e.mjs) and name the
+   * font here, so the phone shows the same icons as the desktop sheet and
+   * chat rather than a Unicode lookalike.
+   *
+   * Starfinder 2e inherits it: it is a PF2e fork and ships the same font.
+   * On a system that does not, the fallback keeps the character readable —
+   * "2" and "R" still say what they mean. */
+  .vm-sys-action-glyph {
+    font-family: "Pathfinder2eActions", var(--vm-font-body, sans-serif);
+    font-weight: normal;
+    font-style: normal;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+  }
+
+  .vm-sys-line-content {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    overflow: hidden;
+  }
+
+  .vm-sys-line-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-1);
+  }
+
+  .vm-sys-row-dnd {
+    margin-bottom: var(--vm-space-2);
+    padding: var(--vm-space-2) var(--vm-space-3);
+  }
+
+  .vm-sys-dnd-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vm-space-2);
+    margin-bottom: var(--vm-space-1);
+    padding-bottom: var(--vm-space-1);
+    border-bottom: 1px solid var(--vm-hairline);
+  }
+
+  .vm-sys-line-content .vm-ms-row-main {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .vm-sys-row-dnd .vm-sys-meta-row {
+    margin-top: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .vm-sys-dnd-meta {
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--vm-space-1) !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    justify-content: flex-end !important;
+  }
+
+  .vm-sys-dnd-meta .vm-sys-meta {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .vm-sys-row-dnd .vm-ms-row-action {
+    width: 36px;
+    min-height: 36px;
+    border-left: 1px solid var(--vm-hairline);
+  }
+
+  .vm-sys-row-pf2e {
+    display: block;
+    gap: var(--vm-space-2);
+    margin-bottom: 6px;
+    padding: var(--vm-space-2) var(--vm-space-3);
+  }
+
+  .vm-sys-row-pf2e.vm-has-cost {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .vm-sys-pf2e-cost {
+    display: grid;
+    place-items: center;
+    min-height: 34px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-sm);
+    background: var(--vm-surface-raised);
+    color: var(--vm-accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .vm-sys-pf2e-content {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .vm-sys-pf2e-main {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-1);
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .vm-sys-pf2e-main .vm-ms-row-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .vm-sys-pf2e-main .vm-sys-subline {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    flex: 0 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vm-sys-row-pf2e .vm-ms-row-action {
+    width: 32px;
+    min-height: 32px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: var(--vm-radius-pill);
+    background: var(--vm-surface-card);
+  }
+
+  .vm-sys-row-pf2e .vm-ms-row-action-label {
+    display: none;
+  }
+
+  .vm-sys-row-cyber {
+    margin-bottom: var(--vm-space-2);
+    padding: var(--vm-space-2);
+  }
+
+  .vm-sys-hud-top,
+  .vm-sys-field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vm-space-2);
+    margin-bottom: var(--vm-space-1);
+  }
+
+  .vm-sys-hud-core {
+    padding: var(--vm-space-1) 0;
+  }
+
+  .vm-sys-hud-data {
+    margin-top: var(--vm-space-1);
+    padding: var(--vm-space-1) var(--vm-space-2);
+    border: 1px solid var(--vm-hairline);
+    color: var(--vm-text-dim);
+    font-size: 0.74rem;
+  }
+
+  .vm-sys-row-cyber .vm-ms-row-action {
+    width: auto;
+    min-height: 32px;
+    display: inline-flex;
+    gap: var(--vm-space-1);
+    border: 1px solid var(--vm-surface-border);
+    background: rgb(0 0 0 / 0.18);
+  }
+
+  .vm-sys-row-cyber .vm-ms-row-action-label {
+    display: none;
+  }
+
+  .vm-sys-row-hope {
+    margin-bottom: var(--vm-space-2);
+    padding: var(--vm-space-2);
+  }
+
+  .vm-sys-field-main {
+    flex: 1 1 0;
+    min-width: 0;
+    border-top: 1px solid var(--vm-hairline);
+    border-bottom: 1px solid var(--vm-hairline);
+    padding: var(--vm-space-1) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--vm-space-2);
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .vm-sys-field-main .vm-sys-meta-row,
+  .vm-sys-hope-meta {
+    margin: 0 !important;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--vm-space-1) !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+  }
+
+  .vm-sys-row-hope .vm-ms-row-action {
+    width: 34px;
+    min-height: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--vm-surface-border);
+    background: var(--vm-surface-raised);
+  }
+
+  .vm-sys-row-hope .vm-ms-row-action-label {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Tab bar (above the content)
+   *
+   * A scrolling segmented row rather than fixed equal columns: systems with
+   * six or seven tabs used to squeeze every label down to an unreadable
+   * sliver, and the sheet cannot know in advance how many it will be handed.
    * ------------------------------------------------------------------ */
 
   .vm-ms-tabs {
     flex: 0 0 auto;
     display: flex;
-    padding-bottom: var(--vm-safe-bottom);
-    background: rgb(0 0 0 / 0.35);
-    border-top: 1px solid var(--vm-surface-border);
+    gap: var(--vm-space-1);
+    padding: var(--vm-space-2) var(--vm-space-3);
+    background: rgb(0 0 0 / 0.25);
+    border-bottom: 1px solid var(--vm-surface-border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    min-height: 48px;
+  }
+
+  .vm-ms-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .vm-ms-tab {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 2px;
-    min-height: calc(52px * var(--vm-scale));
-    padding: var(--vm-space-1) 0;
-    border: none;
-    background: transparent;
+    gap: var(--vm-space-2);
+    min-height: calc(36px * var(--vm-scale));
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--vm-radius-pill);
+    background: rgb(255 255 255 / 0.05);
     color: var(--vm-text-dim);
-    font-size: 1rem;
+    font-size: 0.9rem;
+    scroll-snap-align: center;
     -webkit-tap-highlight-color: transparent;
+    transition: color var(--vm-anim-fast) var(--vm-ease), border-color var(--vm-anim-fast) var(--vm-ease);
   }
 
   .vm-ms-tab span {
-    font-size: 0.6rem;
+    font-size: 0.74rem;
     letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 
   .vm-ms-tab.vm-active {
-    color: var(--vm-accent);
+    border-color: var(--vm-accent);
+    background: color-mix(in srgb, var(--vm-accent) 20%, transparent);
+    color: var(--vm-text);
   }
 
-  /* Keyboard: give the content the room. */
-  html[data-vm-keyboard="open"] .vm-ms-tabs {
-    display: none;
+  .vm-ms-tab.vm-active .vm-icon {
+    color: var(--vm-accent);
   }
 
   /* ------------------------------------------------------------------ *
@@ -635,7 +990,7 @@
    * ------------------------------------------------------------------ */
 
   /* Wide screens: two reading columns per section. */
-  @media (min-width: 640px) {
+  @media (min-width: 820px) {
     .vm-ms-section {
       columns: 2;
       column-gap: var(--vm-space-6);
@@ -651,39 +1006,52 @@
     }
   }
 
-  /* Landscape phones: compress the header so content keeps the height. */
+  /* Landscape phones: compress the header so content keeps the height. The
+   * identity row and the stats share a line, and the HP bar goes under both. */
   @media (orientation: landscape) and (max-height: 520px) {
     .vm-ms-header {
-      grid-template-columns: auto 1fr auto;
+      display: grid;
+      grid-template-columns: auto 1fr;
       grid-template-areas:
-        "portrait title stats"
-        "portrait hp hp";
+        "identity stats"
+        "hp hp";
       align-items: center;
+      gap: var(--vm-space-1) var(--vm-space-3);
       padding-block: 2px var(--vm-space-1);
     }
 
+    .vm-ms-identity {
+      grid-area: identity;
+    }
+
+    .vm-ms-stats {
+      grid-area: stats;
+    }
+
+    .vm-ms-hp {
+      grid-area: hp;
+      height: 20px;
+    }
+
     .vm-ms-portrait {
-      width: 46px;
-      height: 46px;
+      width: 42px;
+      height: 42px;
     }
 
     .vm-ms-title h1 {
       font-size: 1rem;
     }
 
-    .vm-ms-hp {
-      height: 20px;
-      margin-top: 2px;
-    }
-
     .vm-ms-hp-text {
       font-size: 0.75rem;
     }
 
+    .vm-ms-tabs {
+      padding-block: var(--vm-space-1);
+    }
+
     .vm-ms-tab {
-      min-height: 40px;
-      flex-direction: row;
-      gap: var(--vm-space-1);
+      min-height: 34px;
     }
   }
 }

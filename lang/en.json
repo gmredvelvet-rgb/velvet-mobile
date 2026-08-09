@@ -15,6 +15,16 @@
         "Tablet": "Force Tablet",
         "Off": "Off (desktop experience)"
       },
+      "Theme": {
+        "Name": "Theme",
+        "Hint": "The look of the mobile interface. Auto follows whichever of the Velvet sheet modules this world has active, then falls back to the game system — so the phone matches the sheet your players already use on a desktop. Pick one outright to override that.",
+        "Auto": "Auto (match the sheet module)",
+        "Velvet": "Velvet Mobile (default)",
+        "Aaa": "AAA D&D — gold and Cinzel",
+        "VelvetPf2e": "Velvet PF2e — gilded void",
+        "Cyber": "Cyberpunk — cyan on navy",
+        "Hopefinder": "Hopefinder — survivor field manual"
+      },
       "Map": {
         "Name": "Show map",
         "Hint": "Keeps the game canvas visible behind the mobile interface, with touch navigation (drag to pan, pinch to zoom). Turn it off to free memory and battery on phones: the map is then never loaded at all. Changing this requires a reload."
@@ -88,9 +98,14 @@
     },
     "Shell": {
       "Chat": "Chat",
-      "Menu": "Quick actions",
+      "Back": "Back",
+      "Commands": "Actions",
+      "More": "More",
+      "Roster": "Change character",
+      "Sheet": "Character",
       "Dice": "Roll dice",
       "Move": "Move token",
+      "MoveStop": "Stop moving",
       "NoToken": "You have no token on the active scene to move.",
       "Target": "Target",
       "TargetClear": "Clear target",
@@ -102,7 +117,6 @@
       "Combat": "Encounter tracker",
       "Round": "Round",
       "NoEncounter": "No encounter in progress.",
-      "SwipeHint": "Swipe up or tap your portrait",
       "NoActorTitle": "No character available",
       "NoActorHint": "Ask your GM to assign a character to your user, or grant you ownership of one with a token in the scene.",
       "NoActorGMHint": "Assign yourself a character in the user configuration, or activate a scene with tokens. To leave mobile mode: settings button → Mobile Mode → Off."

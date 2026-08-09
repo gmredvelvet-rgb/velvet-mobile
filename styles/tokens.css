@@ -10,6 +10,21 @@
  * unlayered CSS — good-citizen override behavior.
  */
 
+/**
+ * Sublayer order, stated once and explicitly.
+ *
+ * Left implicit, a sublayer's priority comes from whichever of our
+ * stylesheets the browser happens to parse first — and across layers, order
+ * beats specificity outright, so a theme rule that lands in an earlier layer
+ * loses to sheet.css no matter how specific it is. That failure is silent
+ * and selective: custom properties still apply (nothing competes for them),
+ * so a theme looks half-applied — right colours, wrong shapes.
+ *
+ * `themes` is last because a theme exists to restyle everything above it.
+ */
+@layer velvet-mobile.tokens, velvet-mobile.base, velvet-mobile.components,
+  velvet-mobile.shell, velvet-mobile.sheet, velvet-mobile.themes;
+
 @layer velvet-mobile.tokens {
   :root {
     /* Viewport ------------------------------------------------------- */
@@ -41,11 +56,23 @@
     --vm-radius-sm: 6px;
     --vm-radius-md: 10px;
     --vm-radius-lg: 16px;
+    /* Fully rounded ends: chips, badges, tabs, toggles. A token rather than
+     * a literal so a theme whose house style is cut-square can say so once
+     * instead of chasing every pill in the module. */
+    --vm-radius-pill: 999px;
 
     /* Surfaces (dark chrome, matching Foundry's UI language) ---------- */
     --vm-surface: rgb(24 24 28 / 0.96);
     --vm-surface-raised: rgb(38 38 44 / 0.98);
     --vm-surface-border: rgb(255 255 255 / 0.12);
+    /* The ground a full screen sits on, behind scrolling content. */
+    --vm-surface-sunken: linear-gradient(180deg, rgb(26 24 32) 0%, rgb(17 16 21) 40%);
+    /* A tappable tile: ability cells, chips, cards. */
+    --vm-surface-card: rgb(255 255 255 / 0.04);
+    /* Separator between list rows — lighter than a border, still visible. */
+    --vm-hairline: rgb(255 255 255 / 0.06);
+    /* Opaque enough to hide the rows scrolling under a sticky heading. */
+    --vm-sticky-bg: rgb(19 18 23 / 0.95);
     --vm-text: rgb(235 235 240);
     --vm-text-dim: rgb(255 255 255 / 0.6);
     --vm-accent: rgb(176 106 179);
@@ -65,6 +92,25 @@
      * impossible to bring forward — so we stay underneath instead.        */
     --vm-z-shell: 30;
     --vm-z-sheet: 50;
+
+    /* Type ------------------------------------------------------------ *
+     * Empty means "whatever Foundry is using", which is the right default
+     * for a module that does not ship fonts. Themes fill these in with the
+     * families their companion sheet module already self-hosts, and fall
+     * back to a generic when that module is not installed.                */
+    --vm-font-title: inherit;
+    --vm-font-body: inherit;
+    /* The showpiece face, for the character's name and section headings. A
+     * separate token because the decorative cuts these themes use are built
+     * for a few large words: the same face on a 0.62rem tab label is a
+     * smudge. Defaults to the title face, so a theme need only set it when
+     * it actually has a second, fancier one.                              */
+    --vm-font-display: var(--vm-font-title);
+    /* How a section heading is set. Themes that shout use uppercase and
+     * wide tracking; themes that whisper leave these alone.               */
+    --vm-title-transform: none;
+    --vm-title-spacing: 0.04em;
+    --vm-title-weight: 700;
 
     /* Motion (mirrors motion/animation-engine.mjs) --------------------- */
     --vm-anim-fast: 150ms;

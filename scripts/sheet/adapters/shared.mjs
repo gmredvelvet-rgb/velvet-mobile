@@ -515,3 +515,25 @@ export const conditionsSection = (conditions) => {
     conditions
   }];
 };
+
+/**
+ * A tab of its own for running effects, or nothing when none are running.
+ *
+ * Effects used to sit at the top of Combat, above the strikes and actions
+ * they push you past. A caster mid-encounter can be carrying a dozen, which
+ * turned the one tab you reach for on your turn into a long scroll. They get
+ * their own tab, last, because they are something you consult rather than
+ * something you act from.
+ *
+ * @param {Array<object>} effects
+ * @returns {Array<object>} Zero or one tab.
+ */
+export const effectsTab = (effects) => {
+  if (!effects.length) return [];
+  return [{
+    id: "effects",
+    icon: "fa-solid fa-bolt",
+    label: t("Effects"),
+    sections: [{ title: t("Effects"), badge: String(effects.length), rows: effects }]
+  }];
+};

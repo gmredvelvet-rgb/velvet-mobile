@@ -8,7 +8,7 @@
  */
 
 import {
-  attempt, conditionsOf, conditionsSection, describe, formatDuration, hpOf, itemMenu, labelOf,
+  attempt, conditionsOf, conditionsSection, describe, effectsTab, formatDuration, hpOf, itemMenu, labelOf,
   makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, signed, t, text
 } from "./shared.mjs";
 
@@ -411,7 +411,6 @@ export function model(actor) {
       label: t("TabCombat"),
       sections: [
         ...conditionsSection(conditions),
-        ...(effects.length ? [{ title: t("Effects"), badge: String(effects.length), rows: effects }] : []),
         { title: t("Attacks"), rows: weapons }
       ]
     },
@@ -431,6 +430,8 @@ export function model(actor) {
     label: t("TabFeatures"),
     sections: [{ title: t("TabFeatures"), rows: features }]
   });
+
+  tabs.push(...effectsTab(effects));
 
   return {
     subtitle,

@@ -8,9 +8,11 @@
  * @module core/api
  */
 
-import { DEVICES, HOOKS, INPUTS, MODULE_ID } from "./constants.mjs";
+import { DEVICES, HOOKS, INPUTS, MODULE_ID, THEMES } from "./constants.mjs";
 import { services } from "./services.mjs";
+import { Theme } from "./theme.mjs";
 import { BottomSheet } from "../components/bottom-sheet.mjs";
+import { NavStack } from "../components/nav-stack.mjs";
 import { VelvetComponent } from "../components/component.mjs";
 import { registerAdapter, registeredSystems } from "../sheet/adapters.mjs";
 
@@ -93,17 +95,33 @@ export function createAPI({ isActive }) {
 
   const components = Object.freeze({
     VelvetComponent,
+    /** The shell's own presentation mechanic: views pushed from the right. */
+    NavStack,
+    /** Still supported for modules that want a bottom-anchored panel. */
     BottomSheet
+  });
+
+  const theme = Object.freeze({
+    /** @returns {string} The theme in force, never "auto". */
+    get current() {
+      return Theme.current;
+    },
+    /** Re-resolve and re-apply, e.g. after enabling a sheet module at runtime. */
+    refresh() {
+      Theme.apply();
+    }
   });
 
   return Object.freeze({
     version: game.modules.get(MODULE_ID)?.version ?? "0.0.0",
     hooks: HOOKS,
     devices: DEVICES,
+    themes: THEMES,
     device,
     state,
     gestures,
     sheet,
+    theme,
     components
   });
 }

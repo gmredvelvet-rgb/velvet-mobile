@@ -17,6 +17,7 @@ export const L10N = "VELVETMOBILE";
 /** Setting keys (registered under MODULE_ID). */
 export const SETTINGS = Object.freeze({
   MODE: "mode",
+  THEME: "theme",
   MAP: "map",
   WORLD_LICENSED: "worldLicensed",
   LICENSE_MENU: "licenseMenu",
@@ -70,6 +71,53 @@ export const CHAT_MODES = Object.freeze({
   NONE: "none",
   ROLLS: "rolls",
   ALL: "all"
+});
+
+/**
+ * Visual themes. Each one carries the design language of one of the desktop
+ * sheet modules onto the phone, so a table that plays with a themed sheet
+ * gets the same sheet on mobile rather than a second, unrelated look.
+ *
+ * `AUTO` is not a theme — it is the instruction to work one out (see
+ * core/theme.mjs). Every other value is also the `data-vm-theme` attribute
+ * value and the CSS block name in styles/themes.css.
+ */
+export const THEMES = Object.freeze({
+  AUTO: "auto",
+  /** The module's own look: purple accent on neutral dark chrome. */
+  VELVET: "velvet",
+  /** AAA D&D Character Sheet — gold on black, Cinzel. */
+  AAA: "aaa",
+  /** SF2e / PF2e Cyberpunk UI — cyan on navy, Rajdhani. */
+  CYBER: "cyber",
+  /** Hopefinder Survivor Sheet — olive and amber, Barlow Condensed. */
+  HOPEFINDER: "hopefinder",
+  /** Velvet PF2e Sheet — gold on void, Cinzel Decorative. */
+  VELVET_PF2E: "velvet-pf2e"
+});
+
+/**
+ * Companion sheet modules, by module id. When one of these is active its
+ * theme wins over the system default: three of them serve pf2e, so the
+ * system alone cannot say which look the table actually plays with.
+ *
+ * Order matters — the first active match wins.
+ */
+export const THEME_MODULES = Object.freeze([
+  Object.freeze({ id: "aaa-dnd-sheet", theme: THEMES.AAA }),
+  Object.freeze({ id: "dnd-velvet-sheets", theme: THEMES.AAA }),
+  Object.freeze({ id: "sf2e-cyber-sheet", theme: THEMES.CYBER }),
+  Object.freeze({ id: "hopefinder-sheet", theme: THEMES.HOPEFINDER }),
+  Object.freeze({ id: "pf2e-velvet-sheet", theme: THEMES.VELVET_PF2E })
+]);
+
+/** Fallback theme per game system, when no companion module is installed. */
+export const THEME_SYSTEMS = Object.freeze({
+  dnd5e: THEMES.AAA,
+  sf2e: THEMES.CYBER,
+  starfinder2e: THEMES.CYBER,
+  pf2e: THEMES.VELVET_PF2E,
+  hopefinder: THEMES.HOPEFINDER
 });
 
 /** Values for the `mode` setting. */
@@ -132,7 +180,10 @@ export const ROOT_ATTRS = Object.freeze({
   KEYBOARD: "data-vm-keyboard",
   SHEET_ONLY: "data-vm-sheet-only",
   DRAWER: "data-vm-drawer",
-  MAP: "data-vm-map"
+  MAP: "data-vm-map",
+  THEME: "data-vm-theme",
+  /** The raw system id, so a theme can still special-case one system. */
+  SYSTEM: "data-vm-system"
 });
 
 /** CSS custom properties written by JS onto <html> (inline, so they win over tokens.css defaults). */

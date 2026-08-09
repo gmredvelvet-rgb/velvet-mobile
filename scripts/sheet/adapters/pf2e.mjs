@@ -12,7 +12,7 @@
  */
 
 import {
-  at, attempt, conditionsOf, conditionsSection, describe, hpOf, itemMenu, itemTypeLabel,
+  at, attempt, conditionsOf, conditionsSection, describe, effectsTab, hpOf, itemMenu, itemTypeLabel,
   formatDuration, maybeLocalize, makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, signed,
   sortConditions, t, text, titleCase
 } from "./shared.mjs";
@@ -130,13 +130,31 @@ function actionCost(item) {
   return { type, value: type === "free" ? 0 : (num(item?.system?.actions?.value, item?.system?.actions) ?? 1) };
 }
 
-/** Short badge for an action cost — "1", "2", "3", "R", "F". */
-function costBadge(item) {
+/**
+ * An action cost as the character the system's own action font draws.
+ *
+ * PF2e ships `Pathfinder2eActions`, where "1"/"2"/"3" are the action pips,
+ * "R" is the reaction arrow and "F" the free-action diamond — plus the
+ * variable forms like "1/2". Emitting those characters and setting that font
+ * gives the real iconography rather than a Unicode lookalike, and it matches
+ * what the player sees on the desktop sheet and in chat.
+ *
+ * Read from the item when the system computes it, because that keeps the
+ * mapping in the system's hands: variable-cost activities ("1 or 2") and
+ * anything a future release adds come through correctly without us tracking
+ * the table. The fallback covers items that expose a cost but no glyph.
+ *
+ * @param {Item} item
+ * @returns {string} A glyph character, or "" when the item has no cost.
+ */
+function costGlyph(item) {
+  const own = text(item?.actionGlyph).trim();
+  if (own) return own;
   const cost = actionCost(item);
   if (!cost) return "";
-  if (cost.type === "reaction") return t("Reaction");
-  if (cost.type === "free") return t("FreeAction");
-  return "◆".repeat(Math.max(1, Math.min(3, cost.value || 1)));
+  if (cost.type === "reaction") return "R";
+  if (cost.type === "free") return "F";
+  return String(Math.max(1, Math.min(3, cost.value || 1)));
 }
 
 /** Whether this spell can be cast right now (slots, focus, cantrip…). */
@@ -901,7 +919,7 @@ export function model(actor) {
       img: item.img,
       label: item.name,
       sub: displayTraits(item),
-      badge: costBadge(item),
+      cost: costGlyph(item),
       onTap: usePf2eItem(actor, item),
       menu: itemMenu(actor, item),
       description: describe(item)
@@ -949,9 +967,16 @@ export function model(actor) {
   const currency = attempt("currency", () => {
     const coins = actor.inventory?.currency;
     if (!coins) return [];
-    return CURRENCY
-      .map(([key, label]) => ({ id: key, label: t(label), badge: String(num(coins[key]) ?? 0) }))
-      .filter((row) => row.badge !== "0");
+    const values = CURRENCY
+      .map(([key, label]) => `${t(label)} ${String(num(coins[key]) ?? 0)}`)
+      .filter(Boolean);
+    return values.length ? [{
+      id: "currency",
+      label: values.join(" · "),
+      badge: "",
+      sub: "",
+      onTap: null
+    }] : [];
   }, []);
 
   /* Spells grouped by rank, with cantrips, focus and rituals split out. */
@@ -979,11 +1004,11 @@ export function model(actor) {
         id: spell.id,
         img: spell.img,
         label: spell.name,
-        // The action cost is already the badge; the sub line is for traits.
+        // The action cost has its own field; the sub line is for traits.
         sub: traitsOf(spell)
           .filter((trait) => !["common", "uncommon", "rare", "unique", "cantrip", "focus"].includes(trait))
           .slice(0, 3).map(titleCase).join(" · "),
-        badge: costBadge(spell),
+        cost: costGlyph(spell),
         onTap: castSpell(actor, spell),
         menu: itemMenu(actor, spell),
         description: describe(spell)
@@ -1087,7 +1112,7 @@ export function model(actor) {
   /* Combat, in the desktop's own order: options, strikes, then the three
      action panels. Every section is conditional — a creature with nothing
      but exploration activities must not get an empty Strikes list. */
-  if (conditions.length || effects.length || strikes.length || activities.length
+  if (conditions.length || strikes.length || activities.length
     || toggles.length || exploration.length || downtime.length) {
     tabs.push({
       id: "combat",
@@ -1095,7 +1120,6 @@ export function model(actor) {
       label: t("TabCombat"),
       sections: [
         ...conditionsSection(conditions),
-        ...(effects.length ? [{ title: t("Effects"), badge: String(effects.length), rows: effects }] : []),
         ...(toggles.length ? [{ title: t("Toggles"), rows: toggles }] : []),
         ...(strikes.length ? [{ title: t("Strikes"), rows: strikes }] : []),
         ...(activities.length ? [{ title: t("TabActions"), rows: activities }] : []),
@@ -1129,6 +1153,8 @@ export function model(actor) {
       sections: [{ title: t("TabFeatures"), rows: features }]
     });
   }
+
+  tabs.push(...effectsTab(effects));
 
   return {
     subtitle,

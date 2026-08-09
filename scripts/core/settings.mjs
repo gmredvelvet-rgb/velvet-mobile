@@ -4,7 +4,7 @@
  * @module core/settings
  */
 
-import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES, STEP_SOUNDS } from "./constants.mjs";
+import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES, STEP_SOUNDS, THEMES } from "./constants.mjs";
 import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
 
@@ -16,7 +16,7 @@ export class Settings {
    * @param {(value: number) => void} callbacks.onScaleChange
    * @param {(value: boolean) => void} callbacks.onDebugChange
    */
-  static register({ onModeChange, onMapChange, onScaleChange, onDebugChange }) {
+  static register({ onModeChange, onMapChange, onScaleChange, onThemeChange, onDebugChange }) {
     const localize = (key) => `${L10N}.Settings.${key}`;
 
     // World licence flag: written by the GM's client after Patreon auth,
@@ -52,6 +52,27 @@ export class Settings {
       },
       default: MODES.AUTO,
       onChange: onModeChange
+    });
+
+    /* Auto follows the table's own sheet module, then the game system — see
+       core/theme.mjs. The explicit choices are for a table that runs one of
+       these sheets but prefers the look of another. */
+    game.settings.register(MODULE_ID, SETTINGS.THEME, {
+      name: localize("Theme.Name"),
+      hint: localize("Theme.Hint"),
+      scope: "client",
+      config: true,
+      type: String,
+      choices: {
+        [THEMES.AUTO]: localize("Theme.Auto"),
+        [THEMES.VELVET]: localize("Theme.Velvet"),
+        [THEMES.AAA]: localize("Theme.Aaa"),
+        [THEMES.VELVET_PF2E]: localize("Theme.VelvetPf2e"),
+        [THEMES.CYBER]: localize("Theme.Cyber"),
+        [THEMES.HOPEFINDER]: localize("Theme.Hopefinder")
+      },
+      default: THEMES.AUTO,
+      onChange: onThemeChange
     });
 
     game.settings.register(MODULE_ID, SETTINGS.MAP, {
@@ -174,6 +195,11 @@ export class Settings {
   /** @returns {boolean} Whether the GM has activated a licence for this world. */
   static get worldLicensed() {
     return game.settings.get(MODULE_ID, SETTINGS.WORLD_LICENSED) === true;
+  }
+
+  /** @returns {string} One of THEMES; AUTO means "work it out" (core/theme.mjs). */
+  static get theme() {
+    return game.settings.get(MODULE_ID, SETTINGS.THEME);
   }
 
   /** @returns {boolean} Whether the game canvas stays available on mobile. */

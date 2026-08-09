@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.20.0 — una interfaz nueva y temas por sistema (2026-08-09)
+
+Esta version reemplaza el modelo de interaccion completo y anade temas que siguen
+a la hoja de escritorio que use tu mesa. Todo lo de debajo —adaptadores, gestos,
+perfilado de dispositivo, canvas, licencia— sigue igual.
+
+### La interfaz
+
+- **Barra de estado fija arriba**: retrato, nombre y puntos de golpe siempre a la
+  vista. Antes habia que abrir la ficha para saber como estabas.
+- **Barra de comandos fija abajo**: cinco acciones con ranura propia, sin paso de
+  despliegue previo. Lo que pase de la quinta va a un menu de desbordamiento.
+- **Una sola mecanica de presentacion**: ficha, chat, combate, objetivos y la lista
+  de personajes entran por la derecha y se cierran con el galon o arrastrando desde
+  el borde izquierdo. Antes eran tres mecanicas distintas con tres formas de cerrar.
+- **La lista de personajes es una rejilla** a pantalla completa: retrato, nombre y
+  vida por tarjeta. Una partida de ocho se lee de un vistazo.
+- **Las pestanas de la ficha pasan arriba**, como fila segmentada con desplazamiento
+  horizontal. La parte de abajo de la pantalla es de la barra de comandos.
+- **Los mensajes entrantes ya no roban la pantalla**: un aviso bajo la barra de
+  estado muestra la tirada y se desvanece solo. Tocarlo abre el registro completo.
+- **Los efectos tienen pestana propia**, la ultima. Estaban dentro de Combate, que
+  es la pestana que mas se usa en turno, y un lanzador con doce efectos la convertia
+  en un scroll largo.
+
+### Temas por sistema
+
+El modulo adopta el lenguaje visual de la hoja de escritorio que el mundo tenga
+activa, y si no hay ninguna, la del sistema de juego:
+
+| Modulo activo | Sistema | Tema |
+|---|---|---|
+| AAA D&D Character Sheet | dnd5e | Oro sobre negro, Cinzel |
+| Velvet PF2e Sheet | pf2e | Vacio dorado, Cinzel Decorative |
+| SF2e / PF2e Cyberpunk UI | sf2e | Cian sobre azul noche, Rajdhani |
+| Hopefinder Survivor Sheet | pf2e | Oliva y ambar, Barlow Condensed |
+| *ninguno* | cualquiera | El morado propio del modulo |
+
+No es un cambio de paleta: reproduce el tratamiento real de cada hoja —los marcos
+de doble corchete, el rombo que abre cada encabezado, la regla ornamentada con su
+punto inicial, la rejilla holografica con lineas de barrido, el grano de pelicula.
+Se elige solo, o a mano en **Tema** dentro de ajustes.
+
+Cada sistema recibe ademas su propia composicion de fila: tarjeta de rasgo en D&D,
+entrada de actividad en PF2e, registro HUD en Starfinder, panel de campo en
+Hopefinder. Las acciones de cada fila van a la derecha en los cuatro.
+
+### PF2e y Starfinder 2e
+
+- **Iconografia oficial de acciones**: los costes se dibujan con la fuente
+  `Pathfinder2eActions` del propio sistema, leyendo el glifo que el sistema calcula.
+  Antes se aproximaban con rombos Unicode y las palabras "Reaccion" y "Accion libre".
+  Los costes variables (*1 o 2*, *1 a 3*) llegan correctos.
+
+### Arreglos
+
+- El modo de movimiento ocultaba la barra que contenia su unica salida. El joystick
+  lleva ahora su propio boton de cierre y la barra de comandos ya no se esconde.
+- Las acciones de una fila podian encogerse hasta desaparecer detras de un nombre
+  largo, y en dos sistemas salian debajo en vez de a la derecha.
+- La descripcion desplegable de una fila PF2e se dibujaba como una tercera columna.
+- El orden de las capas CSS se declara ahora de forma explicita: sin eso, las reglas
+  de tema perdian contra las de base y el tema quedaba a medias —colores correctos,
+  formas antiguas.
+
 ## 0.19.2 — un fallo de credenciales ya no apaga el modulo (2026-08-01)
 
 - Se separan los dos veredictos del servidor. Una respuesta sobre el derecho
