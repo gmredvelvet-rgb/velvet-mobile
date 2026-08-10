@@ -535,6 +535,30 @@ function explorationRows(actor, items) {
  * @param {Actor} actor
  * @returns {object[]} Chips, or the generic ones if PF2e's API is missing.
  */
+/**
+ * The catalogue's slugs, without its second set of keys.
+ *
+ * `ConditionManager.conditions` indexes every condition twice: once by slug
+ * ("frightened") and once by compendium UUID
+ * ("Compendium.pf2e.conditionitems.Item.…", or `sf2e.conditions` on
+ * Starfinder). Walking the map's entries therefore offers every condition
+ * twice over — and tapping the UUID copy hands `toggleCondition()` something
+ * that is not a slug, which the system refuses outright with "Unrecognized
+ * condition: Compendium…".
+ *
+ * The system filters its own keys exactly this way. `conditionsSlugs` is that
+ * filter, so it is preferred; the fallback repeats it for versions that
+ * predate the accessor.
+ *
+ * @param {Map<string, object>} catalogue
+ * @returns {string[]}
+ */
+function conditionSlugs(catalogue) {
+  const own = game.pf2e?.ConditionManager?.conditionsSlugs;
+  if (Array.isArray(own) && own.length) return own;
+  return [...catalogue.keys()].filter((key) => !String(key).startsWith("Compendium."));
+}
+
 function pf2eConditions(actor) {
   const catalogue = game.pf2e?.ConditionManager?.conditions;
   if (!actor?.isOwner || !catalogue || typeof actor.toggleCondition !== "function") {
@@ -549,8 +573,9 @@ function pf2eConditions(actor) {
   }
 
   const chips = [];
-  for (const [slug, condition] of catalogue.entries()) {
+  for (const slug of conditionSlugs(catalogue)) {
     if (slug === "persistent-damage") continue;
+    const condition = catalogue.get(slug);
     const on = applied.get(slug);
     const valued = condition?.system?.value?.isValued === true;
     const chip = {

@@ -442,13 +442,6 @@
     border-bottom: 1px solid var(--vm-hairline);
   }
 
-  /* Kept for anything outside the renderers that still builds a bare row;
-     the renderers themselves compose through .vm-sys-line. */
-  .vm-ms-row-line {
-    display: flex;
-    align-items: stretch;
-  }
-
   .vm-ms-row-main {
     flex: 1 1 auto;
     min-width: 0;
@@ -631,7 +624,6 @@
   .vm-sys-kicker,
   .vm-sys-status,
   .vm-sys-meta,
-  .vm-sys-trait,
   .vm-sys-badge {
     font-size: 0.66rem;
     line-height: 1;
@@ -640,8 +632,7 @@
   }
 
   .vm-sys-badge,
-  .vm-sys-meta,
-  .vm-sys-trait {
+  .vm-sys-meta {
     display: inline-flex;
     align-items: center;
     min-height: 20px;
@@ -653,7 +644,6 @@
   }
 
   .vm-sys-meta-row,
-  .vm-sys-traits,
   .vm-sys-subline {
     display: flex;
     flex-wrap: wrap;

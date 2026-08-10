@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.20.1 — arreglos de la 0.20.0 (2026-08-09)
+
+Dos fallos que entraron con la interfaz nueva, ambos con prueba de regresion.
+
+### Condiciones duplicadas y sin poder aplicarse (PF2e y Starfinder 2e)
+
+La pestana de Combate listaba **cada condicion dos veces**, y tocar una de las
+dos copias no hacia nada salvo lanzar un error del sistema: *"Unrecognized
+condition: Compendium.sf2e.conditions.Item…"*.
+
+El catalogo del sistema (`ConditionManager.conditions`) esta indexado dos
+veces: por slug y por UUID de compendio. Recorriamos todas las claves y
+tratabamos cada una como si fuera un slug, asi que cada condicion aparecia
+por partida doble y la copia con clave UUID era imposible de aplicar.
+
+Ahora se lee la lista filtrada que el propio sistema expone
+(`conditionsSlugs`), con el filtro equivalente como respaldo para versiones
+que no la tengan.
+
+Afectaba por igual a PF2e y a Starfinder 2e, aunque el aviso solo saltaba a la
+vista en Starfinder.
+
+### La pestana se congelaba al cerrar pantallas
+
+Cerrar una pantalla mientras otra seguia animandose podia **bloquear la
+pestana entera**, sin recuperacion. Los metodos que recorren la pila esperando
+a que llegue a una forma se quedaban girando sobre una condicion que nunca
+cambiaba, y un bucle asi no cede el hilo: no es una animacion colgada, es el
+navegador parado.
+
+Se reproducia asi: ficha abierta, abrir el chat, cerrarlo y tocar *Mover
+ficha* dentro de los 150 ms de la animacion.
+
+Salir de la pila y animarse hacia fuera son ahora dos momentos distintos: la
+pantalla deja la pila al instante —de modo que un segundo toque nunca cierra
+la de debajo— y solo la animacion se encola.
+
+### Limpieza
+
+- Se retiran reglas CSS que ya no aplicaban a nada tras unificar la
+  composicion de filas.
+- Tres ayudantes internos de la pantalla de ajustes dejan de exportarse: no
+  los importaba nadie y solo ensanchaban la superficie publica.
+
 ## 0.20.0 — una interfaz nueva y temas por sistema (2026-08-09)
 
 Esta version reemplaza el modelo de interaccion completo y anade temas que siguen

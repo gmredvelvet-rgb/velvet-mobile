@@ -19,6 +19,7 @@
 import { CLS, L10N, ROOT_ATTRS } from "../core/constants.mjs";
 import { Motion, DURATION, EASING } from "../motion/animation-engine.mjs";
 import { services } from "../core/services.mjs";
+import { Logger } from "../core/logger.mjs";
 import { VelvetComponent } from "./component.mjs";
 
 /** Distance from the left edge (px) where a back-drag may start. */
@@ -35,8 +36,18 @@ export class NavStack extends VelvetComponent {
   /** @type {NavView[]} Bottom to top. */
   #views = [];
 
-  /** @type {boolean} Guards re-entrant pops during an exit animation. */
-  #busy = false;
+  /**
+   * Tail of the pop queue. Overlapping pops are serialised rather than
+   * dropped: `popAll`, `popTo` and `reveal` loop until the stack reaches a
+   * shape, so a pop that quietly did nothing left them spinning on a
+   * condition that could never change — and an `await` loop that never
+   * yields to the event loop freezes the tab, not just the animation.
+   * @type {Promise<void>}
+   */
+  #queue = Promise.resolve();
+
+  /** @type {boolean} True while an exit animation is on screen. */
+  #animating = false;
 
   /** @returns {number} */
   get depth() {
@@ -79,9 +90,14 @@ export class NavStack extends VelvetComponent {
     // the moment it is covered, not when the animation finishes.
     below?.setCovered(true);
 
-    Motion.slide(view.element, "translateX(100%)", "translateX(0)").then(() => {
-      if (view.element?.isConnected) view.element.style.transform = "";
-    });
+    // Motion itself never rejects, but this callback runs a frame later on a
+    // view that may already have been popped — so it is guarded rather than
+    // left to surface as an unhandled rejection nobody sees.
+    Motion.slide(view.element, "translateX(100%)", "translateX(0)")
+      .then(() => {
+        if (view.element?.isConnected) view.element.style.transform = "";
+      })
+      .catch((err) => Logger.debug("Screen entrance settled early", err));
     if (below) {
       Motion.slide(below.element, "translateX(0)", `translateX(-${PARALLAX * 100}%)`);
     }
@@ -94,23 +110,49 @@ export class NavStack extends VelvetComponent {
    * @param {boolean} [options.animate]
    * @returns {Promise<void>}
    */
-  async pop({ animate = true } = {}) {
-    if (this.#busy) return;
+  pop(options = {}) {
+    // Leaving the stack and animating away are two different moments.
+    //
+    // The view is claimed *now*, synchronously: callers guard on `find()` and
+    // `includes()` before asking for a pop, and if those still reported a
+    // screen that is already on its way out, a second request would close the
+    // screen behind it instead. The animation is what gets queued.
     const view = this.#views.pop();
-    if (!view) return;
+    if (!view) return this.#queue;
     const below = this.top;
-
-    this.#busy = true;
     below?.setCovered(false);
-    if (animate) {
-      const from = view.element.style.transform || "translateX(0)";
-      await Promise.all([
-        Motion.slide(view.element, from, "translateX(100%)", { duration: DURATION.FAST, easing: EASING.ACCELERATE }),
-        below ? Motion.slide(below.element, `translateX(-${PARALLAX * 100}%)`, "translateX(0)", { duration: DURATION.FAST }) : null
-      ].filter(Boolean));
+
+    // Never rejecting: the loops below await this, and one failed exit must
+    // not take the rest of the stack down with it.
+    const run = () => this.#retire(view, below, options)
+      .catch((err) => Logger.error("Could not close a screen", err));
+    this.#queue = this.#queue.then(run, run);
+    return this.#queue;
+  }
+
+  /**
+   * Animate a claimed view away and dispose of it. Only ever called through
+   * the queue in `pop()`, so two exits never overlap on screen.
+   * @param {NavView} view
+   * @param {NavView|null} below
+   * @param {object} [options]
+   * @param {boolean} [options.animate]
+   */
+  async #retire(view, below, { animate = true } = {}) {
+    this.#animating = true;
+    try {
+      if (animate) {
+        const from = view.element.style.transform || "translateX(0)";
+        await Promise.all([
+          Motion.slide(view.element, from, "translateX(100%)", { duration: DURATION.FAST, easing: EASING.ACCELERATE }),
+          below ? Motion.slide(below.element, `translateX(-${PARALLAX * 100}%)`, "translateX(0)", { duration: DURATION.FAST }) : null
+        ].filter(Boolean));
+      }
+      if (below?.element) below.element.style.transform = "";
+    } finally {
+      // Left set by a throw, this would refuse every later back-drag.
+      this.#animating = false;
     }
-    if (below?.element) below.element.style.transform = "";
-    this.#busy = false;
 
     view.detach();
     if (!this.#views.length) document.documentElement.removeAttribute(ROOT_ATTRS.DRAWER);
@@ -123,7 +165,9 @@ export class NavStack extends VelvetComponent {
    * @param {boolean} [options.animate]
    */
   async popAll({ animate = false } = {}) {
-    while (this.#views.length) await this.pop({ animate: animate && this.#views.length === 1 });
+    for (let guard = this.#views.length; guard > 0 && this.#views.length; guard -= 1) {
+      await this.pop({ animate: animate && this.#views.length === 1 });
+    }
   }
 
   /**
@@ -144,8 +188,9 @@ export class NavStack extends VelvetComponent {
    * @param {NavView} view
    */
   async popTo(view) {
-    if (!this.#views.includes(view)) return;
-    while (this.#views.includes(view)) await this.pop({ animate: this.top === view });
+    for (let guard = this.#views.length; guard > 0 && this.#views.includes(view); guard -= 1) {
+      await this.pop({ animate: this.top === view });
+    }
   }
 
   /**
@@ -171,7 +216,9 @@ export class NavStack extends VelvetComponent {
    */
   async reveal(view) {
     if (!this.#views.includes(view)) return;
-    while (this.top !== view) await this.pop({ animate: this.#views.at(-2) === view });
+    for (let guard = this.#views.length; guard > 0 && this.top !== view; guard -= 1) {
+      await this.pop({ animate: this.#views.at(-2) === view });
+    }
   }
 
   /** @override */
@@ -191,7 +238,7 @@ export class NavStack extends VelvetComponent {
    * @param {object} g Pan gesture event.
    */
   handleBackDrag(view, g) {
-    if (view !== this.top || this.#busy) return;
+    if (view !== this.top || this.#animating) return;
     const below = this.#views.at(-2) ?? null;
     const width = view.element.getBoundingClientRect().width || window.innerWidth;
 

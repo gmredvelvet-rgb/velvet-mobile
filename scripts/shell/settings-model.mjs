@@ -42,7 +42,7 @@ const isField = (value, name) => {
  * @param {*} choices
  * @returns {Record<string, string>|null}
  */
-export function normalizeChoices(choices) {
+function normalizeChoices(choices) {
   let raw = choices;
   if (typeof raw === "function") {
     try {
@@ -70,7 +70,7 @@ export function normalizeChoices(choices) {
  * @param {object} setting  A `game.settings.settings` entry.
  * @returns {{control: string, choices: object|null, range: object|null}}
  */
-export function controlFor(setting) {
+function controlFor(setting) {
   const type = setting?.type;
   const fromField = isField(type, "DataField") ? type : null;
   const choices = normalizeChoices(setting?.choices ?? fromField?.choices);
@@ -118,7 +118,7 @@ function rangeOfField(field) {
  * @param {string} namespace
  * @returns {{id: string, label: string}}
  */
-export function categoryOf(namespace) {
+function categoryOf(namespace) {
   if (namespace === "core") return { id: "core", label: game.i18n.localize("PACKAGECONFIG.TABS.core") };
   if (namespace === game.system?.id) return { id: "system", label: game.system.title };
   const module = game.modules?.get(namespace);
