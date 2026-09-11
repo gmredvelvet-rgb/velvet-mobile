@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.0
+
+- **Requires Velvet License Hub.** One Patreon connection now licenses every GM RedVelvet
+  module, in every world. Foundry installs the hub together with this module.
+- Patrons who already activated this module keep their licence: it stays valid until they
+  connect the hub once.
+
 ## 0.20.1 — arreglos de la 0.20.0 (2026-08-09)
 
 Dos fallos que entraron con la interfaz nueva, ambos con prueba de regresion.
