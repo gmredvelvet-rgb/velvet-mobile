@@ -7,6 +7,7 @@
 import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES, STEP_SOUNDS, THEMES } from "./constants.mjs";
 import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
+import { hubActive, isModuleLicensed } from "../license/license-hub.mjs";
 
 export class Settings {
   /**
@@ -28,8 +29,9 @@ export class Settings {
       default: false
     });
 
-    // GM-only entry point to connect, re-authorise or release the slot.
-    game.settings.registerMenu(MODULE_ID, SETTINGS.LICENSE_MENU, {
+    // GM-only entry point to connect, re-authorise or release the slot. With
+    // Velvet License Hub active, the hub's menu is the one place for that.
+    if (!hubActive()) game.settings.registerMenu(MODULE_ID, SETTINGS.LICENSE_MENU, {
       name: localize("License.Name"),
       label: localize("License.Label"),
       hint: localize("License.Hint"),
@@ -192,9 +194,15 @@ export class Settings {
     return game.settings.get(MODULE_ID, SETTINGS.MODE);
   }
 
-  /** @returns {boolean} Whether the GM has activated a licence for this world. */
+  /**
+   * Whether this world is licensed for Velvet Mobile: Velvet License Hub's
+   * verdict once it has spoken for this world, the world flag until then — so a
+   * patron who already paid is not locked out by updating. Every gate reads it
+   * through here, `evaluate()` included.
+   * @returns {boolean}
+   */
   static get worldLicensed() {
-    return game.settings.get(MODULE_ID, SETTINGS.WORLD_LICENSED) === true;
+    return isModuleLicensed(MODULE_ID);
   }
 
   /** @returns {string} One of THEMES; AUTO means "work it out" (core/theme.mjs). */

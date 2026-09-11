@@ -12,6 +12,7 @@
 import { HOOKS, MODES, MODULE_ID, SETTINGS } from "./core/constants.mjs";
 import { LicenseClient } from "./license/license-client.mjs";
 import { LicenseUI } from "./license/license-ui.mjs";
+import { licenseHub } from "./license/license-hub.mjs";
 import { Logger } from "./core/logger.mjs";
 import { Settings } from "./core/settings.mjs";
 import { Theme } from "./core/theme.mjs";
@@ -170,6 +171,14 @@ class VelvetMobile {
    * @returns {Promise<boolean>} Whether the module may run.
    */
   async #checkLicense() {
+    // With Velvet License Hub active the licence is the hub's — including the
+    // $3 tier, which the hub covers for this module alone. No client, no card of
+    // our own; the verdict arrives through Settings.worldLicensed.
+    const hub = licenseHub(2);
+    if (hub) {
+      hub.register(MODULE_ID);
+      return Settings.worldLicensed;
+    }
     if (game.user?.isGM) {
       const client = LicenseClient.instance;
       const licensed = await client.initialize();
@@ -273,7 +282,10 @@ if (IS_GAME_PAGE) {
   Hooks.once("ready", () => controller.ready());
   // The GM authorising mid-session unlocks every connected client without
   // anyone reloading; the flag arrives here as a world-setting update.
+  // The hub's verdict arrives the same way, under its own key. evaluate()
+  // re-reads the licence through Settings.worldLicensed, which knows both.
   Hooks.on("updateSetting", (setting) => {
+    if (setting.key === "velvet-license-hub.worldLicence") return void controller.evaluate();
     if (setting.key !== `${MODULE_ID}.${SETTINGS.WORLD_LICENSED}`) return;
     if (setting.value === true || setting.value === "true") controller.evaluate();
     else controller.deactivate();
