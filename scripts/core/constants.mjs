@@ -17,6 +17,7 @@ export const L10N = "VELVETMOBILE";
 /** Setting keys (registered under MODULE_ID). */
 export const SETTINGS = Object.freeze({
   MODE: "mode",
+  USER_MODE_PREFIX: "userMode-",
   THEME: "theme",
   MAP: "map",
   WORLD_LICENSED: "worldLicensed",
@@ -92,6 +93,8 @@ export const THEMES = Object.freeze({
   CYBER: "cyber",
   /** Hopefinder Survivor Sheet — olive and amber, Barlow Condensed. */
   HOPEFINDER: "hopefinder",
+  /** Modern RPG — stone, parchment and pixel inventory styling. */
+  MODERN_RPG: "modern-rpg",
   /** Velvet PF2e Sheet — gold on void, Cinzel Decorative. */
   VELVET_PF2E: "velvet-pf2e"
 });
@@ -106,6 +109,7 @@ export const THEMES = Object.freeze({
 export const THEME_MODULES = Object.freeze([
   Object.freeze({ id: "aaa-dnd-sheet", theme: THEMES.AAA }),
   Object.freeze({ id: "dnd-velvet-sheets", theme: THEMES.AAA }),
+  Object.freeze({ id: "talespire-foundrysheets-by-velvet", theme: THEMES.MODERN_RPG }),
   Object.freeze({ id: "sf2e-cyber-sheet", theme: THEMES.CYBER }),
   Object.freeze({ id: "hopefinder-sheet", theme: THEMES.HOPEFINDER }),
   Object.freeze({ id: "pf2e-velvet-sheet", theme: THEMES.VELVET_PF2E })
@@ -126,6 +130,12 @@ export const MODES = Object.freeze({
   PHONE: "phone",
   TABLET: "tablet",
   OFF: "off"
+});
+
+/** GM-controlled per-player mode override values. */
+export const USER_MODE_OVERRIDES = Object.freeze({
+  /** Respect the mode selected on that player's own client. */
+  OWN: "own"
 });
 
 /** Device classifications produced by the DeviceProfiler. */

@@ -12,9 +12,9 @@
  */
 
 import {
-  at, attempt, conditionsOf, conditionsSection, describe, effectsTab, hpOf, itemMenu, itemTypeLabel,
-  formatDuration, maybeLocalize, makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, signed,
-  sortConditions, t, text, titleCase
+  at, attempt, biographyRows, conditionsOf, conditionsSection, describe, effectsTab, hpOf, itemMenu, itemTypeLabel,
+  formatDuration, maybeLocalize, makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, sendToChat,
+  signed, paperDollOf, sortConditions, t, text, titleCase
 } from "./shared.mjs";
 import { Logger } from "../../core/logger.mjs";
 
@@ -29,6 +29,17 @@ const INVENTORY_TYPES = new Set(["weapon", "armor", "shield", "equipment", "cons
 
 /** Item types that belong in the features tab. */
 const FEATURE_TYPES = new Set(["feat", "action", "ancestry", "heritage", "background", "class", "deity", "lore"]);
+
+/**
+ * Item types PF2e can post as a chat card. ItemPF2e#toMessage renders
+ * `templates/chat/<type>-card.hbs` (weapons, ammo, armour and backpacks share
+ * the equipment card); ancestries, heritages, backgrounds, classes, deities
+ * and lores have no such template, and posting one throws.
+ */
+const CARD_TYPES = new Set([
+  "action", "affliction", "campaignFeature", "condition", "consumable", "effect", "equipment",
+  "feat", "melee", "shield", "spell", "treasure", "weapon", "ammo", "armor", "backpack"
+]);
 
 /**
  * Whether to skip the roll dialog, computed the way PF2e computes it.
@@ -192,7 +203,7 @@ const usePf2eItem = (actor, item) => safe(async () => {
   const action = slug ? (game.pf2e?.actions?.get?.(slug) ?? game.pf2e?.actions?.[slug]) : null;
   if (typeof action === "function") return action({ actors: [actor] });
   if (typeof action?.use === "function") return action.use({ actors: [actor] });
-  if (typeof item.toMessage === "function") return item.toMessage();
+  if (CARD_TYPES.has(item.type) && typeof item.toMessage === "function") return item.toMessage();
   if (typeof item.use === "function") return item.use();
   throw new Error(t("NotRollable"));
 });
@@ -809,6 +820,258 @@ function slotTotals(actor) {
   return totals;
 }
 
+/* -- Crafting -------------------------------------------------------------- */
+
+/** A module string with {placeholders} filled in, the same on v13 and v14. */
+const tf = (key, data) => t(key).replace(/\{(\w+)\}/gu, (match, name) => String(data?.[name] ?? match));
+
+/** Formula items come from compendiums: posting one needs no card of the actor's. */
+const formulaChat = (actor, item) => ({
+  id: "chat",
+  icon: "fa-solid fa-comment",
+  label: t("SendToChat"),
+  onTap: safe(() => sendToChat(actor, item, { card: false }))
+});
+
+/**
+ * Roll the Craft check for a known formula, one batch, against its DC — what
+ * the desktop's Craft button does.
+ * @param {Actor} actor
+ * @param {object} formula  From CharacterCrafting#getFormulas.
+ */
+const craftFormula = (actor, formula) => safe(async () => {
+  const craft = game.pf2e?.actions?.craft;
+  if (typeof craft !== "function") throw new Error(t("NotRollable"));
+  return craft({
+    item: formula.item,
+    quantity: formula.batchSize,
+    difficultyClass: { value: formula.dc, visible: true, scope: "check" },
+    actors: actor,
+    event: rollEvent()
+  });
+});
+
+/**
+ * Make a prepared formula now, spending its slot (and a resource when the
+ * ability has one), then say so in chat as the desktop sheet does.
+ */
+const craftPrepared = (actor, ability, index) => safe(async () => {
+  const consume = !ability.resource || Boolean(actor.getResource?.(ability.resource)?.value);
+  const item = await ability.craft(index, { consume });
+  if (!item) return;
+  const key = "PF2E.Actions.Craft.Information.ReceiveItem";
+  const data = { actorName: actor.name, itemName: item.name, quantity: 1 };
+  await ChatMessage.create({
+    author: game.user.id,
+    content: typeof game.i18n.format === "function" ? game.i18n.format(key, data) : game.i18n.localize(key, data),
+    speaker: { alias: actor.name }
+  });
+});
+
+/** Pick one of the formulas an ability can take and prepare it. */
+const promptPrepareFormula = (ability) => safe(async () => {
+  const formulas = (await ability.getValidFormulas())
+    .sort((a, b) => (a.item.level - b.item.level) || a.item.name.localeCompare(b.item.name));
+  if (!formulas.length) {
+    ui.notifications?.info(t("NoValidFormulas"));
+    return;
+  }
+  const escape = foundry.utils.escapeHTML;
+  const options = formulas.map((formula) => (
+    `<option value="${escape(formula.uuid)}">${escape(formula.item.name)} · ${escape(t("Level"))} ${formula.item.level}</option>`
+  )).join("");
+  const uuid = await foundry.applications.api.DialogV2.wait({
+    window: { title: ability.label },
+    position: { width: 340 },
+    content: `<select name="formula" style="width:100%;height:36px">${options}</select>`,
+    buttons: [{
+      action: "prepare",
+      label: t("PrepareFormula"),
+      icon: "fa-solid fa-plus",
+      default: true,
+      callback: (_event, button) => button.form?.elements.formula?.value ?? null
+    }],
+    rejectClose: false
+  });
+  if (uuid) await ability.prepareFormula(uuid);
+});
+
+/**
+ * One crafting ability — Advanced Alchemy, a munitions or snare kit — with
+ * its resource, prepared formulas and a row to prepare another.
+ * @param {Actor} actor
+ * @param {object} ability  A CraftingAbility.
+ * @param {Set<string>} shownResources  Resources already given a row; several
+ *                                      alchemical abilities share reagents.
+ */
+async function craftingAbilitySection(actor, ability, shownResources) {
+  const data = await ability.getSheetData();
+  const rows = [];
+  const resource = data.resource;
+  if (resource && !shownResources.has(resource.slug)) {
+    shownResources.add(resource.slug);
+    const value = num(resource.value) ?? 0;
+    const max = num(resource.max) ?? 0;
+    rows.push({
+      id: `resource-${resource.slug}`,
+      label: maybeLocalize(resource.label, titleCase(resource.slug)),
+      sub: tf("CraftResourceCost", { cost: data.resourceCost }),
+      badge: `${value}/${max}`,
+      actions: [
+        { icon: "fa-solid fa-minus", label: t("Decrease"), onTap: safe(() => actor.updateResource(resource.slug, Math.max(0, value - 1))) },
+        { icon: "fa-solid fa-plus", label: t("Increase"), onTap: safe(() => actor.updateResource(resource.slug, Math.min(max, value + 1))) }
+      ]
+    });
+  }
+
+  // Quantities are set per formula only where the ability counts batches.
+  const adjustable = Boolean(ability.resource || ability.isDailyPrep);
+  data.prepared.forEach((formula, index) => {
+    const item = formula.item;
+    const menu = [formulaChat(actor, item)];
+    if (ability.isAlchemical) {
+      menu.push({
+        id: "signature",
+        icon: formula.isSignatureItem ? "fa-solid fa-star" : "fa-regular fa-star",
+        label: t("SignatureItem"),
+        onTap: safe(() => ability.toggleSignatureItem(formula.uuid))
+      });
+    } else {
+      menu.push({
+        id: "expended",
+        icon: "fa-solid fa-check",
+        label: t("ToggleExpended"),
+        onTap: safe(() => ability.toggleFormulaExpended(index))
+      });
+    }
+    menu.push({
+      id: "unprepare",
+      icon: "fa-solid fa-xmark",
+      label: t("Unprepare"),
+      onTap: safe(() => ability.unprepareFormula(index))
+    });
+    rows.push({
+      id: `${ability.slug}-${index}`,
+      img: item.img,
+      label: item.name,
+      sub: [
+        `${t("Level")} ${item.level}`,
+        formula.isSignatureItem ? t("SignatureItem") : "",
+        formula.expended ? t("Expended") : ""
+      ].filter(Boolean).join(" · "),
+      badge: `×${formula.quantity}`,
+      dim: formula.expended,
+      // Alchemical formulas are made all at once by daily crafting; other
+      // prepared ones are made one at a time, spending their slot.
+      onTap: !ability.isAlchemical && !formula.expended ? craftPrepared(actor, ability, index) : undefined,
+      useLabel: t("Craft"),
+      useIcon: "fa-solid fa-hammer",
+      actions: adjustable ? [
+        { icon: "fa-solid fa-minus", label: t("Decrease"), onTap: safe(() => ability.setFormulaQuantity(index, "decrease")) },
+        { icon: "fa-solid fa-plus", label: t("Increase"), onTap: safe(() => ability.setFormulaQuantity(index, "increase")) }
+      ] : [],
+      menu,
+      description: describe(item)
+    });
+  });
+
+  if (data.remainingSlots > 0 || ability.resource) {
+    rows.push({
+      id: `${ability.slug}-prepare`,
+      label: t("PrepareFormula"),
+      sub: ability.maxSlots ? tf("CraftSlotsFree", { count: data.remainingSlots }) : "",
+      onTap: promptPrepareFormula(ability)
+    });
+  }
+
+  return {
+    title: ability.label,
+    badge: tf("CraftMaxLevel", { level: data.maxItemLevel }),
+    rows
+  };
+}
+
+/**
+ * The crafting tab — the desktop's, minus drag-and-drop: crafting abilities
+ * (alchemical first, as there), daily crafting, and the known formulas with
+ * their Craft check. Formulas resolve from compendium UUIDs asynchronously,
+ * so the whole tab is one lazily loaded section. Every character gets it, as
+ * on the desktop: anyone can learn a formula.
+ * @param {Actor} actor
+ * @returns {object[]} Zero or one tab (none for NPCs and familiars).
+ */
+function craftingTab(actor) {
+  const crafting = actor.crafting;
+  if (typeof crafting?.getFormulas !== "function") return [];
+  const abilities = crafting.abilities?.contents ?? [...(crafting.abilities ?? [])];
+
+  const load = async () => {
+    const sections = [];
+    const shownResources = new Set();
+    // The desktop lists alchemical and prepared abilities; spontaneous ones
+    // have nothing to prepare and craft through the formulas below.
+    const listed = abilities.filter((ability) => ability.isPrepared)
+      .sort((a, b) => Number(b.isAlchemical) - Number(a.isAlchemical));
+    for (const ability of listed) {
+      sections.push(await craftingAbilitySection(actor, ability, shownResources));
+    }
+
+    if (abilities.some((ability) => ability.isDailyPrep || ability.isAlchemical)) {
+      const done = Boolean(actor.flags?.pf2e?.dailyCraftingComplete);
+      sections.push({
+        title: t("DailyCrafting"),
+        rows: [
+          {
+            id: "daily-crafting",
+            label: t("DailyCraftingPerform"),
+            sub: done ? t("DailyCraftingDone") : "",
+            dim: done,
+            onTap: done ? undefined : safe(() => crafting.performDailyCrafting())
+          },
+          ...(done ? [{
+            id: "daily-crafting-reset",
+            label: t("DailyCraftingReset"),
+            onTap: safe(() => crafting.resetDailyCrafting())
+          }] : [])
+        ]
+      });
+    }
+
+    const known = (await crafting.getFormulas())
+      .sort((a, b) => (a.item.level - b.item.level) || a.item.name.localeCompare(b.item.name));
+    sections.push({
+      title: t("Formulas"),
+      empty: t("NoFormulas"),
+      rows: known.map((formula) => {
+        let cost = "";
+        try {
+          cost = game.pf2e?.Coins?.fromPrice?.(formula.item.price, formula.batchSize)?.toString() ?? "";
+        } catch { /* priceless formula */ }
+        return {
+          id: formula.uuid,
+          img: formula.item.img,
+          label: formula.item.name,
+          sub: [`${t("Level")} ${formula.item.level}`, tf("CraftDC", { dc: formula.dc }), cost].filter(Boolean).join(" · "),
+          badge: `×${formula.batchSize}`,
+          onTap: craftFormula(actor, formula),
+          useLabel: t("Craft"),
+          useIcon: "fa-solid fa-hammer",
+          menu: [formulaChat(actor, formula.item)],
+          description: describe(formula.item)
+        };
+      })
+    });
+    return sections;
+  };
+
+  return [{
+    id: "crafting",
+    icon: "fa-solid fa-hammer",
+    label: t("TabCrafting"),
+    sections: [{ title: t("TabCrafting"), load }]
+  }];
+}
+
 /* -- Model ----------------------------------------------------------------- */
 
 /** @param {Actor} actor @returns {object} */
@@ -895,6 +1158,7 @@ export function model(actor) {
   const toggles = attempt("toggles", () => toggleRows(actor), []);
   const conditions = attempt("conditions", () => pf2eConditions(actor), []);
   const effects = attempt("effects", () => effectRows(actor), []);
+  const biography = attempt("biography", () => biographyRows(actor), []);
 
   /* Rests. Neither Pathfinder 2e nor Starfinder 2e has a short rest: Rest for
      the Night is the only one. Take a Breather is deliberately not offered —
@@ -973,7 +1237,9 @@ export function model(actor) {
         sub: [carryLabel(item), maybeLocalize(CONFIG.PF2E?.Item?.typeLabels?.[item.type], itemTypeLabel(item.type))]
           .filter(Boolean).join(" · "),
         badge: badges.join(" "),
-        onTap: usePf2eItem(actor, item),
+        // Only consumables are used, as on the desktop sheet; for the rest
+        // "use" would merely post the card, which the menu already offers.
+        onTap: item.type === "consumable" ? usePf2eItem(actor, item) : undefined,
         actions: typeof actor.changeCarryType === "function" ? [{
           icon: "fa-solid fa-hand",
           label: t("Carry"),
@@ -988,6 +1254,7 @@ export function model(actor) {
         description: describe(item)
       };
     }), []);
+  const paperDoll = attempt("paper doll", () => paperDollOf(actor, "pf2e"), null);
 
   const currency = attempt("currency", () => {
     const coins = actor.inventory?.currency;
@@ -1071,7 +1338,9 @@ export function model(actor) {
       img: item.img,
       label: item.name,
       sub: maybeLocalize(CONFIG.PF2E?.Item?.typeLabels?.[item.type], itemTypeLabel(item.type)),
-      onTap: safe(() => item.toMessage?.()),
+      // Passive: nothing to use. A tap shows the description instead, and
+      // the menu posts it — as a plain message where PF2e has no card.
+      menu: itemMenu(actor, item, [], { card: CARD_TYPES.has(item.type) }),
       description: describe(item)
     })), []);
 
@@ -1129,7 +1398,7 @@ export function model(actor) {
         ...restSection(rests),
         ...(resources.length ? [{ title: t("Resources"), rows: resources }] : []),
         ...(saves.length ? [{ title: t("Saves"), rows: saves }] : []),
-        ...(skills.length ? [{ title: t("Skills"), rows: skills }] : [])
+        ...(skills.length ? [{ type: "skills", title: t("Skills"), rows: skills }] : [])
       ]
     });
   }
@@ -1170,6 +1439,9 @@ export function model(actor) {
     tabs.push({ id: "spells", icon: "fa-solid fa-wand-sparkles", label: t("TabSpells"), sections: spellSections });
   }
 
+  // After spells, as on the desktop sheet.
+  tabs.push(...attempt("crafting", () => craftingTab(actor), []));
+
   if (features.length) {
     tabs.push({
       id: "features",
@@ -1188,6 +1460,8 @@ export function model(actor) {
     applyHp: makeApplyHp(actor),
     applyTempHp: makeApplyTempHp(actor),
     stats,
+    paperDoll,
+    biography,
     tabs
   };
 }

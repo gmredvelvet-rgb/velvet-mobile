@@ -37,6 +37,9 @@ class VelvetMobile {
   /** @type {boolean} */
   #running = false;
 
+  /** @type {Promise<void>} Serialises ownership changes to core.noCanvas. */
+  #noCanvasSync = Promise.resolve();
+
   constructor() {
     this.#profiler = new DeviceProfiler({
       getMode: () => Settings.mode,
@@ -71,6 +74,11 @@ class VelvetMobile {
     Logger.info(`v${game.modules.get(MODULE_ID)?.version ?? "?"} starting`);
     Settings.register({
       onModeChange: () => {
+        this.#syncNoCanvas({ promptReload: true });
+        this.evaluate();
+      },
+      onUserModeChange: (userId) => {
+        if (userId !== game.user?.id) return;
         this.#syncNoCanvas({ promptReload: true });
         this.evaluate();
       },
@@ -115,36 +123,38 @@ class VelvetMobile {
    */
   #syncNoCanvas({ promptReload = false } = {}) {
     if (game.view !== "game") return;
-    try {
-      const current = game.settings.get("core", "noCanvas");
-      const wanted = this.#willActivate() && !Settings.map;
-      // The write is fire-and-forget by design (init must not block on it),
-      // so its rejection is caught here rather than left unhandled.
-      const write = (value) => game.settings.set("core", "noCanvas", value)
-        ?.catch((err) => Logger.warn("Could not write core.noCanvas", err));
-      if (wanted && !current) {
-        write(true);
-        Settings.managedNoCanvas = true;
-      } else if (!wanted && current && Settings.managedNoCanvas) {
-        write(false);
-        Settings.managedNoCanvas = false;
-      } else {
-        return;
+    this.#noCanvasSync = this.#noCanvasSync.then(async () => {
+      try {
+        // Resolve the desired state inside the queue: rapid setting changes
+        // then settle in invocation order instead of racing stale snapshots.
+        const current = game.settings.get("core", "noCanvas");
+        const wanted = this.#willActivate() && !Settings.map;
+        if (wanted && !current) {
+          await game.settings.set("core", "noCanvas", true);
+          await game.settings.set(MODULE_ID, SETTINGS.MANAGED_NOCANVAS, true);
+        } else if (!wanted && current && Settings.managedNoCanvas) {
+          await game.settings.set("core", "noCanvas", false);
+          await game.settings.set(MODULE_ID, SETTINGS.MANAGED_NOCANVAS, false);
+        } else {
+          return;
+        }
+        Logger.info(`core.noCanvas → ${wanted}`);
+        if (promptReload) {
+          await (foundry.applications?.settings?.SettingsConfig ?? globalThis.SettingsConfig)
+            ?.reloadConfirm?.({ world: false });
+        }
+      } catch (err) {
+        Logger.warn("Could not sync core.noCanvas", err);
       }
-      Logger.info(`core.noCanvas → ${wanted}`);
-      if (promptReload) {
-        (foundry.applications?.settings?.SettingsConfig ?? globalThis.SettingsConfig)
-          ?.reloadConfirm?.({ world: false });
-      }
-    } catch (err) {
-      Logger.warn("Could not sync core.noCanvas", err);
-    }
+    });
+    return this.#noCanvasSync;
   }
 
   /** Called on the `ready` hook. */
   async ready() {
     if (game.view !== "game") return;
     try {
+      Settings.registerPlayerModes();
       // The API exists regardless of licence state so other modules can
       // query it, but nothing activates until the world is licensed.
       const api = createAPI({ isActive: () => this.#running });
@@ -280,6 +290,7 @@ if (IS_GAME_PAGE) {
   const controller = new VelvetMobile();
   Hooks.once("init", () => controller.init());
   Hooks.once("ready", () => controller.ready());
+  Hooks.on("createUser", () => Settings.registerPlayerModes());
   // The GM authorising mid-session unlocks every connected client without
   // anyone reloading; the flag arrives here as a world-setting update.
   // The hub's verdict arrives the same way, under its own key. evaluate()

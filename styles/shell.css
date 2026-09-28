@@ -223,7 +223,7 @@
 
   :root {
     --vm-status-h: calc(54px * var(--vm-scale));
-    --vm-cmd-h: calc(58px * var(--vm-scale));
+    --vm-cmd-h: max(58px, calc(58px * var(--vm-scale)));
     --vm-stack-b: calc(var(--vm-safe-bottom) + var(--vm-cmd-h) + var(--vm-space-3));
   }
 
@@ -602,12 +602,14 @@
   .vm-cmd-btn {
     flex: 1 1 0;
     min-width: 0;
+    height: auto;
+    min-height: var(--vm-touch-target);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 0 2px;
+    gap: 4px;
+    padding: 4px 2px;
     border: none;
     background: none;
     color: var(--vm-text-dim);
@@ -625,15 +627,28 @@
 
   .vm-cmd-icon {
     position: relative;
+    flex-shrink: 0;
     display: grid;
     place-items: center;
     font-size: 1.15rem;
     line-height: 1;
+    width: 42px;
+    height: 28px;
+    border-radius: 6px;
+    transition: background var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-cmd-btn.vm-active .vm-cmd-icon,
+  .vm-cmd-btn[aria-expanded="true"] .vm-cmd-icon {
+    background: color-mix(in srgb, var(--vm-accent) 18%, transparent);
   }
 
   .vm-cmd-label {
-    font-size: 0.62rem;
-    line-height: 1;
+    flex-shrink: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0;
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -655,15 +670,17 @@
     display: none;
   }
 
-  /* Overflow menu: everything past the fifth slot. */
+  /* Overflow menu: reserve the fifth slot for More. */
   .vm-cmd-overflow {
     position: absolute;
     right: calc(var(--vm-space-2) + var(--vm-safe-right));
     bottom: calc(100% + var(--vm-space-1));
-    min-width: 180px;
-    padding: var(--vm-space-1);
+    width: min(280px, calc(100vw - 24px));
+    max-height: calc(var(--vm-vvh) - var(--vm-cmd-h) - var(--vm-safe-bottom) - 24px);
+    overflow-y: auto;
+    padding: 6px;
     border: 1px solid var(--vm-surface-border);
-    border-radius: var(--vm-radius-lg);
+    border-radius: 8px;
     background: var(--vm-surface-raised);
     box-shadow: 0 8px 28px rgb(0 0 0 / 0.6);
     transform-origin: bottom right;
@@ -671,20 +688,28 @@
   }
 
   .vm-cmd-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--vm-space-3);
     width: 100%;
-    min-height: var(--vm-touch-target);
-    padding: 0 var(--vm-space-3);
+    min-height: max(48px, var(--vm-touch-target));
+    padding: 10px 12px;
     border: none;
-    border-radius: var(--vm-radius-md);
+    border-radius: 6px;
     background: none;
     color: var(--vm-text);
     font-size: 0.9rem;
     text-align: left;
     -webkit-tap-highlight-color: transparent;
+    white-space: normal;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
+
+  .vm-cmd-row > .vm-icon { width: 24px; flex: 0 0 24px; text-align: center; }
+  .vm-cmd-row > span:not(.vm-cmd-dot) { flex: 1; min-width: 0; }
+  .vm-cmd-row .vm-cmd-dot { position: static; flex: 0 0 9px; }
 
   .vm-cmd-row:active {
     background: rgb(255 255 255 / 0.08);
@@ -692,6 +717,7 @@
 
   .vm-cmd-row.vm-active {
     color: var(--vm-accent);
+    background: color-mix(in srgb, var(--vm-accent) 12%, transparent);
   }
 
   /* ------------------------------------------------------------------ *
@@ -1355,7 +1381,8 @@
 
   .vm-settings {
     position: fixed;
-    inset: 0;
+    inset: 0 0 auto;
+    height: var(--vm-vvh);
     z-index: 60; /* above the sheet drawer and the chat panel */
     display: flex;
     flex-direction: column;
@@ -1364,6 +1391,10 @@
     padding-top: var(--vm-safe-top);
     will-change: transform;
     overscroll-behavior: contain;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 0;
+    color-scheme: dark;
+    box-sizing: border-box;
   }
 
   .vm-set-handle {
@@ -1385,8 +1416,8 @@
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: var(--vm-space-2);
-    padding: 0 var(--vm-space-3) var(--vm-space-2);
+    gap: 12px;
+    padding: 0 max(16px, var(--vm-safe-right)) 16px max(16px, var(--vm-safe-left));
     border-bottom: 1px solid var(--vm-surface-border);
   }
 
@@ -1399,10 +1430,16 @@
 
   .vm-set-title {
     flex: 1;
+    color: var(--vm-text);
     margin: 0;
     border: none;
     font-size: 1.05rem;
     font-weight: 700;
+    min-width: 0;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    font-family: inherit;
+    letter-spacing: 0;
   }
 
   .vm-set-back,
@@ -1415,6 +1452,8 @@
     background: none;
     color: var(--vm-text);
     -webkit-tap-highlight-color: transparent;
+    flex: 0 0 auto;
+    border-radius: 6px;
   }
 
   .vm-set-back[hidden] {
@@ -1423,22 +1462,34 @@
 
   .vm-set-search {
     width: 100%;
-    min-height: 40px;
-    padding: 0 var(--vm-space-3);
+    min-height: 48px;
+    padding: 0 12px 0 42px;
     border: 1px solid var(--vm-surface-border);
-    border-radius: var(--vm-radius-md);
+    border-radius: 6px;
     background: rgb(255 255 255 / 0.06);
     color: var(--vm-text);
     /* 16px or iOS zooms the whole page on focus. */
     font-size: 16px;
   }
 
+  .vm-set-searchbox { position: relative; }
+  .vm-set-searchbox > .vm-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--vm-text-dim);
+    pointer-events: none;
+  }
+
   .vm-set-body {
     flex: 1;
+    scrollbar-color: var(--vm-surface-border) transparent;
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding: var(--vm-space-2) var(--vm-space-3) calc(var(--vm-safe-bottom) + var(--vm-space-6));
+    padding: 8px max(16px, var(--vm-safe-right)) calc(var(--vm-safe-bottom) + 24px) max(16px, var(--vm-safe-left));
   }
 
   /* Package list */
@@ -1447,14 +1498,26 @@
     align-items: center;
     gap: var(--vm-space-3);
     width: 100%;
-    min-height: var(--vm-touch-target);
-    padding: var(--vm-space-2) 0;
+    min-height: 64px;
+    padding: 12px 0;
     border: none;
     border-bottom: 1px solid var(--vm-hairline);
     background: none;
     color: var(--vm-text);
     text-align: left;
     -webkit-tap-highlight-color: transparent;
+    white-space: normal;
+    border-radius: 0;
+  }
+
+  .vm-set-cat-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--vm-accent) 12%, transparent);
+    color: var(--vm-accent);
   }
 
   .vm-set-cat:active {
@@ -1463,14 +1526,16 @@
 
   .vm-set-cat-label {
     flex: 1;
-    font-size: 0.95rem;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
 
   .vm-set-cat-count {
-    padding: 1px 8px;
-    border: 1px solid var(--vm-surface-border);
-    border-radius: var(--vm-radius-pill);
-    background: var(--vm-surface-raised);
+    padding: 0 4px;
+    font-variant-numeric: tabular-nums;
     font-size: 0.72rem;
     color: var(--vm-text-dim);
   }
@@ -1485,8 +1550,8 @@
     background: var(--vm-sticky-bg);
     font-size: 0.8rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--vm-text-dim);
   }
 
@@ -1495,15 +1560,18 @@
     display: flex;
     align-items: center;
     gap: var(--vm-space-3);
-    padding: var(--vm-space-3) 0;
+    padding: 18px 0;
+    min-width: 0;
     border-bottom: 1px solid var(--vm-hairline);
   }
 
   /* Controls that need the width get their own line under the label. */
-  .vm-set-row.vm-set-slider,
-  .vm-set-row.vm-set-text,
-  .vm-set-row.vm-set-file,
-  .vm-set-row.vm-set-select {
+  .vm-set-row-slider,
+  .vm-set-row-text,
+  .vm-set-row-file,
+  .vm-set-row-select,
+  .vm-set-row-number,
+  .vm-set-row-menu {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1517,12 +1585,16 @@
   }
 
   .vm-set-label {
-    font-size: 0.92rem;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
 
   .vm-set-hint {
-    font-size: 0.76rem;
-    line-height: 1.35;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
     color: var(--vm-text-dim);
   }
 
@@ -1530,11 +1602,11 @@
     align-self: flex-start;
     margin-top: var(--vm-space-1);
     padding: 1px 7px;
-    border-radius: var(--vm-radius-pill);
-    background: rgb(176 106 179 / 0.22);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--vm-accent) 10%, transparent);
     border: 1px solid var(--vm-accent);
     font-size: 0.65rem;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: var(--vm-text);
   }
@@ -1550,24 +1622,33 @@
     flex: 0 0 auto;
     position: relative;
     width: 48px;
-    height: 28px;
+    height: 44px;
     padding: 0;
-    border: 1px solid var(--vm-surface-border);
-    border-radius: var(--vm-radius-pill);
-    background: rgb(255 255 255 / 0.08);
+    border: none;
+    border-radius: 0;
+    background: transparent;
     transition: background var(--vm-anim-fast) var(--vm-ease);
     -webkit-tap-highlight-color: transparent;
   }
 
-  .vm-set-toggle.vm-on {
+  .vm-set-toggle::before {
+    content: "";
+    position: absolute;
+    inset: 8px 0;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 16px;
+    background: rgb(255 255 255 / 0.12);
+    transition: background var(--vm-anim-fast) var(--vm-ease);
+  }
+
+  .vm-set-toggle.vm-on::before {
     background: var(--vm-accent);
-    border-color: var(--vm-accent);
   }
 
   .vm-set-knob {
     position: absolute;
-    top: 2px;
-    left: 2px;
+    top: 11px;
+    left: 3px;
     width: 22px;
     height: 22px;
     border-radius: 50%;
@@ -1583,13 +1664,15 @@
   .vm-set-select,
   .vm-set-input {
     width: 100%;
-    min-height: 40px;
-    padding: 0 var(--vm-space-2);
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 12px;
     border: 1px solid var(--vm-surface-border);
     border-radius: var(--vm-radius-sm);
     background: rgb(255 255 255 / 0.06);
     color: var(--vm-text);
     font-size: 16px;
+    box-sizing: border-box;
   }
 
   .vm-set-file {
@@ -1602,8 +1685,8 @@
     flex: 0 0 auto;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     border: 1px solid var(--vm-surface-border);
     border-radius: var(--vm-radius-sm);
     background: var(--vm-surface-raised);
@@ -1620,13 +1703,52 @@
   .vm-set-range {
     flex: 1;
     min-width: 0;
+    appearance: none;
+    padding: 0;
+    border: none;
+    background: transparent;
     accent-color: var(--vm-accent);
     height: var(--vm-touch-target);
   }
 
+  .vm-set-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+    background: var(--vm-surface-border);
+  }
+
+  .vm-set-range::-moz-range-track {
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+    background: var(--vm-surface-border);
+  }
+
+  .vm-set-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    margin-top: -9px;
+    border: 2px solid var(--vm-surface-raised);
+    border-radius: 50%;
+    background: var(--vm-accent);
+  }
+
+  .vm-set-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--vm-surface-raised);
+    border-radius: 50%;
+    background: var(--vm-accent);
+  }
+
   .vm-set-readout {
     flex: 0 0 auto;
-    min-width: 3ch;
+    min-width: 5ch;
+    padding: 6px 8px;
+    border: 1px solid var(--vm-surface-border);
+    border-radius: 4px;
     text-align: right;
     font-variant-numeric: tabular-nums;
     font-size: 0.9rem;
@@ -1645,6 +1767,10 @@
     color: var(--vm-text);
     font-size: 0.85rem;
     -webkit-tap-highlight-color: transparent;
+    white-space: normal;
+    line-height: 1.4;
+    padding-block: 10px;
+    overflow-wrap: anywhere;
   }
 
   .vm-set-menu-btn:active {
@@ -1655,5 +1781,38 @@
     margin: var(--vm-space-6) 0;
     text-align: center;
     color: var(--vm-text-dim);
+  }
+
+  :is(.vm-settings, .vm-cmd) :is(button, input, select):focus-visible {
+    outline: 2px solid var(--vm-accent);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .vm-settings :is(button, input, select):disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .vm-set-row[aria-busy="true"] { border-bottom-color: var(--vm-accent); }
+
+  @media (hover: hover) {
+    :is(.vm-set-cat, .vm-set-back, .vm-set-close, .vm-cmd-row, .vm-cmd-btn):hover {
+      background-color: color-mix(in srgb, var(--vm-accent) 10%, transparent);
+    }
+  }
+
+  @media (min-width: 720px) {
+    .vm-set-header, .vm-set-body {
+      width: min(100%, 800px);
+      margin-inline: auto;
+      box-sizing: border-box;
+    }
+    .vm-set-row:not(.vm-set-row-toggle) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 280px);
+      align-items: center;
+      gap: 24px;
+    }
   }
 }

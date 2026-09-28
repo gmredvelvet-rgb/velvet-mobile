@@ -10,6 +10,15 @@
 
 import { CSS_VARS, DEVICES, ROOT_ATTRS } from "../core/constants.mjs";
 
+/** Attributes owned by UIState. Other services own theme, keyboard and shell state. */
+const PROFILE_ATTRS = Object.freeze([
+  ROOT_ATTRS.ACTIVE,
+  ROOT_ATTRS.DEVICE,
+  ROOT_ATTRS.INPUT,
+  ROOT_ATTRS.ORIENTATION,
+  ROOT_ATTRS.SIZE
+]);
+
 export class UIState {
   /**
    * Project a device profile onto the document root.
@@ -43,7 +52,7 @@ export class UIState {
   /** Remove every attribute and property this class ever wrote. */
   static clear() {
     const root = document.documentElement;
-    for (const attr of Object.values(ROOT_ATTRS)) root.removeAttribute(attr);
+    for (const attr of PROFILE_ATTRS) root.removeAttribute(attr);
     for (const cssVar of Object.values(CSS_VARS)) root.style.removeProperty(cssVar);
   }
 }

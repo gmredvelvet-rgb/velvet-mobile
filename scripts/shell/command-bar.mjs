@@ -17,10 +17,9 @@ import { CLS, L10N } from "../core/constants.mjs";
 import { VelvetComponent } from "../components/component.mjs";
 
 /**
- * Actions shown inline; the rest go to the overflow menu. Five slots is what
- * fits above a 360px viewport at the minimum touch target without crowding.
+ * Reserve the fifth slot for overflow when more than five actions exist.
  */
-const INLINE_SLOTS = 5;
+const INLINE_SLOTS = 4;
 
 export class CommandBar extends VelvetComponent {
   /**
@@ -34,6 +33,9 @@ export class CommandBar extends VelvetComponent {
 
   /** @type {AbortController|null} Listeners tied to the open popover. */
   #overflowAbort = null;
+
+  #active = new Set();
+  #badges = new Set();
 
   /** @param {object} options @param {object[]} options.actions */
   constructor({ actions }) {
@@ -57,6 +59,8 @@ export class CommandBar extends VelvetComponent {
         label: game.i18n.localize(`${L10N}.Shell.More`),
         onTap: () => this.#toggleOverflow()
       });
+      more.setAttribute("aria-haspopup", "menu");
+      more.setAttribute("aria-expanded", "false");
       slots.push(more);
     }
 
@@ -75,7 +79,7 @@ export class CommandBar extends VelvetComponent {
     const el = VelvetComponent.el;
     const btn = el("button", {
       cls: `${CLS}-cmd-btn`,
-      attrs: { type: "button", "data-action": action.name, "aria-label": action.label },
+      attrs: { type: "button", "data-action": action.name, "aria-label": action.label, title: action.label },
       children: [
         el("span", {
           cls: `${CLS}-cmd-icon`,
@@ -101,11 +105,8 @@ export class CommandBar extends VelvetComponent {
    * @param {boolean} on
    */
   setActive(name, on) {
-    this.#slot(name)?.classList.toggle(`${CLS}-active`, on);
-    // A command living in the overflow lights the overflow button instead, so
-    // an active mode is never invisible.
-    if (!this.#slot(name)) this.#slot("more")?.classList.toggle(`${CLS}-active`, on);
-    this.#overflowRow(name)?.classList.toggle(`${CLS}-active`, on);
+    on ? this.#active.add(name) : this.#active.delete(name);
+    this.#syncState();
   }
 
   /**
@@ -114,10 +115,28 @@ export class CommandBar extends VelvetComponent {
    * @param {boolean} on
    */
   setBadge(name, on) {
-    const dot = (this.#slot(name) ?? this.#slot("more"))?.querySelector(`.${CLS}-cmd-dot`);
-    if (!dot) return;
-    if (on) dot.removeAttribute("hidden");
-    else dot.setAttribute("hidden", "");
+    on ? this.#badges.add(name) : this.#badges.delete(name);
+    this.#syncState();
+  }
+
+  #syncState() {
+    for (const action of this.#actions) {
+      const active = this.#active.has(action.name);
+      const slot = this.#slot(action.name);
+      slot?.classList.toggle(`${CLS}-active`, active);
+      slot?.setAttribute("aria-pressed", String(active));
+      const row = this.#overflowRow(action.name);
+      row?.classList.toggle(`${CLS}-active`, active);
+      const badge = this.#badges.has(action.name);
+      for (const node of [slot, row]) {
+        const dot = node?.querySelector(`.${CLS}-cmd-dot`);
+        if (dot) dot.hidden = !badge;
+      }
+    }
+    const hidden = this.#actions.filter((action) => !this.#slot(action.name));
+    this.#slot("more")?.classList.toggle(`${CLS}-active`, hidden.some((a) => this.#active.has(a.name)));
+    const dot = this.#slot("more")?.querySelector(`.${CLS}-cmd-dot`);
+    if (dot) dot.hidden = !hidden.some((a) => this.#badges.has(a.name));
   }
 
   /** @override */
@@ -134,17 +153,22 @@ export class CommandBar extends VelvetComponent {
     const rows = this.#actions.slice(INLINE_SLOTS).map((action) => {
       const row = el("button", {
         cls: `${CLS}-cmd-row`,
-        attrs: { type: "button", "data-action": action.name },
-        children: [VelvetComponent.icon(action.icon), el("span", { text: action.label })]
+        attrs: { type: "button", role: "menuitem", "data-action": action.name },
+        children: [VelvetComponent.icon(action.icon), el("span", { text: action.label }),
+          el("span", { cls: `${CLS}-cmd-dot`, attrs: { hidden: "" } })]
       });
       row.addEventListener("click", () => {
-        this.#closeOverflow();
+        this.#closeOverflow(true);
         action.onTap();
       });
       return row;
     });
 
-    this.#overflow = el("div", { cls: `${CLS}-cmd-overflow`, children: rows });
+    this.#overflow = el("div", {
+      cls: `${CLS}-cmd-overflow`,
+      attrs: { role: "menu", "aria-label": game.i18n.localize(`${L10N}.Shell.More`) },
+      children: rows
+    });
     this.element.append(this.#overflow);
     this.#slot("more")?.setAttribute("aria-expanded", "true");
 
@@ -152,6 +176,24 @@ export class CommandBar extends VelvetComponent {
     // travelling, and would otherwise close it again immediately.
     this.#overflowAbort = new AbortController();
     const { signal } = this.#overflowAbort;
+    this.#syncState();
+    rows[0]?.focus();
+    this.#overflow.addEventListener("keydown", (event) => {
+      const index = rows.indexOf(document.activeElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        this.#closeOverflow(true);
+      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        const next = event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
+          : (index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
+        rows[next]?.focus();
+      }
+    }, { signal });
+    document.addEventListener("focusin", (event) => {
+      if (!this.element?.contains(event.target)) this.#closeOverflow();
+    }, { signal });
     requestAnimationFrame(() => {
       if (signal.aborted) return;
       document.addEventListener("pointerdown", (event) => {
@@ -160,12 +202,13 @@ export class CommandBar extends VelvetComponent {
     });
   }
 
-  #closeOverflow() {
+  #closeOverflow(restoreFocus = false) {
     this.#overflowAbort?.abort();
     this.#overflowAbort = null;
     this.#overflow?.remove();
     this.#overflow = null;
     this.#slot("more")?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) this.#slot("more")?.focus();
   }
 
   /** @param {string} name @returns {HTMLElement|null} */

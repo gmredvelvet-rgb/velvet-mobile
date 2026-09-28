@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.22.0
+
+### A sheet that looks like TaleSpire
+
+- **The Modern RPG theme is rebuilt after the TaleSpire sheet**, not just recoloured: compact
+  header, two-row tab bar with icons, portrait banner, ability strip, HP and temp HP bars, and
+  gold-ruled sections. In English, for D&D 5e and Pathfinder 2e.
+- **Paper doll inventory**: equipment slots over the character's portrait, currency, filters,
+  attunement and investment, search, and an item grid with larger cells. Tap a slot to assign,
+  swap or clear what it holds. Slots are saved by Velvet Mobile itself — the TaleSpire module is
+  not needed.
+- **Portrait framing (GM)**: the gear on the portrait moves, centres or fits the image, with a
+  live preview. Players see the framing the GM saved.
+- **Item inspector**: the ⓘ button opens the item's art, description and actions (Use,
+  Carry/Equip, Send to chat, Edit) in a window, like the original sheet.
+- **Skills in two columns**, with a larger portrait on that tab.
+
+### *Use* only where it does something
+
+- Pathfinder 2e: passive feats, ancestry, heritage, background, class, deity and lore no longer
+  offer *Use*; tapping them shows their description. Sending them to chat no longer fails with
+  *"Failed to load template … ancestry-card.hbs"*. In the inventory, only consumables are used.
+- D&D 5e: features with an activity (Second Wind, Rage…) now run it instead of only posting
+  their card. Passive features, loot and armour show their description.
+
+### Pathfinder 2e crafting
+
+- A new **Crafting** tab for every character: Advanced Alchemy and other prepared crafting
+  abilities (infused reagents, prepared formulas and their quantities, preparing a formula),
+  daily crafting, and the known formulas with their DC and cost — tap one to roll Craft.
+- Free Crafting and Quick Alchemy remain desktop-only, as does learning new formulas.
+
+### For the GM
+
+- **Mobile Mode per player**: in Velvet Mobile's settings the GM can force phone, tablet or
+  desktop for one player's account, or leave the choice to the player.
+
+### Fixes
+
+- A service that fails to start is rolled back cleanly instead of leaving half its listeners
+  behind.
+- Licence requests time out after 20 seconds, and Patreon sign-in only accepts the answer from
+  its own window.
+- The command bar's overflow menu and the settings screen work from a keyboard and give focus
+  back when they close. A setting that fails to save reverts.
+- Touch targets never shrink below 44 px at small interface scales.
+
 ## 0.21.0
 
 - **Requires Velvet License Hub.** One Patreon connection now licenses every GM RedVelvet

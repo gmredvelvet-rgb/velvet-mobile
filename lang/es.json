@@ -15,12 +15,21 @@
         "Tablet": "Forzar tablet",
         "Off": "Apagado (experiencia de escritorio)"
       },
+      "PlayerMode": {
+        "Name": "Modo móvil — {name}",
+        "Hint": "Control del GM para {name}. Usar su propio ajuste deja el control al jugador; las demás opciones sólo afectan a esta cuenta.",
+        "Own": "Usar el ajuste del jugador",
+        "Phone": "Forzar móvil (teléfono)",
+        "Tablet": "Forzar móvil (tablet)",
+        "Off": "Forzar apagado (escritorio)"
+      },
       "Theme": {
         "Name": "Tema",
         "Hint": "El aspecto de la interfaz móvil. Automático sigue el módulo de hoja Velvet que este mundo tenga activo y, si no hay ninguno, el sistema de juego — así el móvil coincide con la hoja que tus jugadores ya usan en el escritorio. Elige uno concreto para forzarlo.",
         "Auto": "Automático (según el módulo de hoja)",
         "Velvet": "Velvet Mobile (por defecto)",
         "Aaa": "AAA D&D — oro y Cinzel",
+        "ModernRpg": "Modern RPG — piedra e inventario",
         "VelvetPf2e": "Velvet PF2e — vacío dorado",
         "Cyber": "Cyberpunk — cian sobre azul noche",
         "Hopefinder": "Hopefinder — manual de campo"
@@ -218,7 +227,26 @@
       "AmmoHint": "¿Qué munición quieres cargar?",
       "AmmoNone": "No hay munición compatible en el inventario de este personaje.",
       "NotRollable": "Este sistema no ofrece una tirada para eso.",
-      "Empty": "Nada que mostrar"
+      "Empty": "Nada que mostrar",
+      "Use": "Usar",
+      "Loading": "Cargando…",
+      "TabCrafting": "Fabricación",
+      "Formulas": "Fórmulas",
+      "NoFormulas": "Aún no conoces ninguna fórmula. Se aprenden en la hoja de escritorio: arrastra un objeto a su pestaña Crafting o usa el Compendium Browser.",
+      "Craft": "Fabricar",
+      "CraftDC": "CD {dc}",
+      "CraftMaxLevel": "Hasta nivel {level}",
+      "CraftSlotsFree": "{count} libres",
+      "CraftResourceCost": "Coste total {cost}",
+      "PrepareFormula": "Preparar fórmula",
+      "NoValidFormulas": "Ninguna fórmula conocida sirve para esta habilidad.",
+      "Expended": "Gastada",
+      "ToggleExpended": "Marcar como gastada",
+      "SignatureItem": "Objeto distintivo",
+      "DailyCrafting": "Fabricación diaria",
+      "DailyCraftingPerform": "Realizar fabricación diaria",
+      "DailyCraftingDone": "Hecha por hoy",
+      "DailyCraftingReset": "Reiniciar fabricación diaria"
     }
   }
 }

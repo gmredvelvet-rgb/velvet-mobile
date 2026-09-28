@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en" data-vm-active data-vm-device="phone" data-vm-sheet-only data-vm-theme="modern-rpg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TaleSpire mobile sheet preview</title>
+  <link rel="stylesheet" href="/styles/tokens.css">
+  <link rel="stylesheet" href="/styles/base.css">
+  <link rel="stylesheet" href="/styles/components.css">
+  <link rel="stylesheet" href="/styles/sheet.css">
+  <link rel="stylesheet" href="/styles/themes.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: #020202; }
+    body { display: flex; justify-content: center; overflow: hidden; }
+    #preview { display: flex; width: min(440px, 100vw); height: 100%; border-inline: 1px solid #6b5a33; }
+  </style>
+</head>
+<body>
+  <main id="preview"></main>
+  <script type="module">
+    window.game = {
+      system: { id: "dnd5e" },
+      user: { isGM: true },
+      modules: new Map([["talespire-foundrysheets-by-velvet", { active: true }]]),
+      settings: { get: () => "modern-rpg" },
+      i18n: { localize: (key) => key.split(".").at(-1) }
+    };
+    window.foundry = { applications: { api: { DialogV2: {
+      wait: (options) => new Promise((resolve) => {
+        const dialog = document.createElement("dialog");
+        const form = document.createElement("form");
+        form.innerHTML = options.content;
+        const footer = document.createElement("footer");
+        for (const config of options.buttons ?? []) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = config.label;
+          button.addEventListener("click", async (event) => {
+            const value = await config.callback?.(event, { form });
+            dialog.remove();
+            resolve(value ?? config.action);
+          });
+          footer.append(button);
+        }
+        form.append(footer);
+        dialog.append(form);
+        document.body.append(dialog);
+        dialog.showModal();
+      })
+    } } } };
+
+    // ?img=<url> swaps the portrait, ?tab=<id> opens a tab, ?inspect=<n> opens
+    // the inspector for inventory row n.
+    const params = new URLSearchParams(location.search);
+    const portrait = params.get("img") ?? "/assets/talespire/slots/art-body.png";
+    const item = (id, name, img) => ({ id, name, img, onTap: () => {} });
+    const slotData = [
+      ["main", "Main Hand", "hand", 0, 2, 17.5, 43, item("sword", "Longsword", "/assets/talespire/slots/art-hand.png")],
+      ["off", "Off Hand", "hand", 82.5, 2, 17.5, 43, item("shield", "Shield", "/assets/talespire/slots/art-body.png")],
+      ["head", "Head", "head", 39, 0, 22, 19, item("helm", "Helmet", "/assets/talespire/slots/art-head.png")],
+      ["body", "Armor", "body", 38.5, 20, 23, 29, item("armor", "Plate Armor", "/assets/talespire/slots/art-body.png")],
+      ["belt", "Belt", "belt", 37.5, 50.5, 25, 9, null],
+      ["amulet", "Amulet", "amulet", 65, 1.5, 13, 15, item("amulet", "Amulet", "/assets/talespire/slots/art-amulet.png")],
+      ["ring1", "Ring", "ring", 22, 27, 11.5, 12.5, null],
+      ["ring2", "Ring", "ring", 66, 37.5, 11.5, 12.5, null],
+      ["gloves", "Gloves", "gloves", 17, 61, 20, 17, item("gloves", "Gloves", "/assets/talespire/slots/art-gloves.png")],
+      ["cape", "Cape", "cape", .5, 59.5, 15, 20, item("cape", "Cape", "/assets/talespire/slots/art-cape.png")],
+      ["boots", "Boots", "boots", 63, 61, 20, 17, item("boots", "Boots", "/assets/talespire/slots/art-boots.png")],
+      ["ranged", "Ranged", "hand", 83, 49, 17, 31, null],
+      ...[1, 2, 3, 4, 5].map((n, i) => [`belt${n}`, `Quick Slot ${n}`, null, 26.1 + i * 9.8, 85, 9.8, 14.5, null])
+    ];
+    const slots = slotData.map(([key, label, frame, x, y, w, h, equipped]) => ({
+      key, label, x, y, w, h, item: equipped,
+      frame: frame ? `/assets/talespire/slots/frame-${frame}.png` : "",
+      art: frame === "ring" ? "/assets/talespire/slots/ring.svg" : key === "ranged" ? "/assets/talespire/slots/ranged.svg" : frame ? `/assets/talespire/slots/art-${frame}.png` : ""
+    }));
+    // Records the last inventory command, so a test can see which one ran.
+    const ran = (name) => () => { window.lastCommand = name; };
+    const gear = Array.from({ length: 24 }, (_, index) => ({
+      id: `gear-${index}`,
+      img: `/assets/talespire/slots/${["art-amulet.png", "art-belt.png", "art-boots.png", "art-gloves.png"][index % 4]}`,
+      label: `Inventory item ${index + 1}`,
+      sub: "Worn · Equipment",
+      badge: index % 3 ? "" : "×2",
+      actions: [{ icon: "fa-solid fa-hand", label: "Carry", onTap: ran("carry") }],
+      menu: [
+        { id: "chat", icon: "fa-solid fa-comment", label: "Send to chat", onTap: ran("chat") },
+        { id: "carry", icon: "fa-solid fa-hand", label: "Carry", onTap: ran("carry") },
+        { id: "edit", icon: "fa-solid fa-pen-to-square", label: "Edit", onTap: ran("edit") }
+      ],
+      description: async () => "<p>A sturdy piece of adventuring gear. <strong>Usage</strong> worn; <strong>Bulk</strong> L.</p><p>Grants a +1 item bonus to checks made to climb.</p>",
+      onTap: ran("use")
+    }));
+    const abilities = ["STR", "DEX", "CON", "INT", "WIS", "CHA"].map((label, index) => ({ label, mod: ["+4", "+0", "+3", "+1", "+2", "-1"][index], onTap: () => {} }));
+    const rows = (names) => names.map((label, index) => ({ id: `${label}-${index}`, label, sub: "Trained", badge: index % 2 ? "+7" : "+4", onTap: () => {} }));
+    // Passive features: nothing to use, so a tap shows the description.
+    const passive = (names) => names.map((label) => ({
+      id: label, label, sub: "Feat", img: "/assets/talespire/slots/art-amulet.png",
+      menu: [
+        { id: "chat", icon: "fa-solid fa-comment", label: "Send to chat", onTap: ran("chat") },
+        { id: "edit", icon: "fa-solid fa-pen-to-square", label: "Edit", onTap: ran("edit") }
+      ],
+      description: async () => `<p>${label}: always on.</p>`
+    }));
+    // PF2e skills plus a lore, as the adapter lists them.
+    const skills = [["Acrobatics", "Dex", "+6"], ["Arcana", "Int", "+4"], ["Athletics", "Str", "+4"], ["Crafting", "Int", "+4"],
+      ["Deception", "Cha", "+7"], ["Diplomacy", "Cha", "+7"], ["Intimidation", "Cha", "+7"], ["Lore: Gladiatorial", "Int", "+4"],
+      ["Medicine", "Wis", "+0"], ["Nature", "Wis", "+0"], ["Occultism", "Int", "+4"], ["Performance", "Cha", "+7"],
+      ["Religion", "Wis", "+0"], ["Society", "Int", "+4"], ["Stealth", "Dex", "+3"], ["Survival", "Wis", "+0"], ["Thievery", "Dex", "+6"]]
+      .map(([label, sub, badge]) => ({ id: label, label, sub, badge, prof: badge !== "+0", onTap: () => {} }));
+    // Crafting resolves formulas asynchronously, as PF2e does from compendiums.
+    const pm = (label) => [
+      { icon: "fa-solid fa-minus", label: "Decrease", onTap: ran(label + "-") },
+      { icon: "fa-solid fa-plus", label: "Increase", onTap: ran(label + "+") }
+    ];
+    const formula = (label, sub, badge, extra = {}) => ({
+      id: label, label, sub, badge, img: "/assets/talespire/slots/art-belt.png",
+      menu: [{ id: "chat", icon: "fa-solid fa-comment", label: "Send to chat", onTap: ran("chat") }],
+      description: async () => `<p>${label}: formula.</p>`, ...extra
+    });
+    const craftingLoad = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return [
+        { title: "Advanced Alchemy", badge: "Up to level 1", rows: [
+          { id: "reagents", label: "Infused Reagents", sub: "Total cost 2", badge: "3/5", actions: pm("reagents") },
+          formula("Elixir of Life (Minor)", "Level 1 · Signature item", "×4", { actions: pm("elixir") }),
+          formula("Alchemist's Fire (Lesser)", "Level 1", "×4", { actions: pm("fire") }),
+          { id: "prepare", label: "Prepare formula", onTap: ran("prepare") }
+        ] },
+        { title: "Daily crafting", rows: [{ id: "daily", label: "Perform daily crafting", onTap: ran("daily") }] },
+        { title: "Formulas", rows: [
+          formula("Alchemist's Fire (Lesser)", "Level 1 · DC 15 · 12 gp", "×4", { onTap: ran("craft"), useLabel: "Craft", useIcon: "fa-solid fa-hammer" }),
+          formula("Elixir of Life (Minor)", "Level 1 · DC 15 · 12 gp", "×4", { onTap: ran("craft"), useLabel: "Craft", useIcon: "fa-solid fa-hammer" }),
+          formula("Bottled Lightning (Lesser)", "Level 1 · DC 15 · 12 gp", "×4", { onTap: ran("craft"), useLabel: "Craft", useIcon: "fa-solid fa-hammer" })
+        ] }
+      ];
+    };
+    const model = {
+      subtitle: "Human · Fighter",
+      hp: { value: 49, max: 49, temp: 0, pct: 100, tempPct: 0, bonus: 0 },
+      ac: 20,
+      applyHp: async () => {}, applyTempHp: async () => {},
+      stats: [{ label: "Initiative", value: "+3" }, { label: "Speed", value: "30" }],
+      biography: [{ id: "bio", label: "Backstory", description: async () => "A veteran adventurer from the northern marches." }],
+      paperDoll: {
+        backdrop: portrait,
+        slots,
+        slottedIds: [],
+        currency: [{ key: "pp", value: 0 }, { key: "gp", value: 7 }, { key: "sp", value: 0 }, { key: "cp", value: 0 }],
+        attunement: { value: 0, max: 3 }
+      },
+      tabs: [
+        { id: "stats", icon: "fa-solid fa-shield-halved", label: "Stats", sections: [{ type: "abilities", abilities }, { title: "Resources", rows: rows(["Hero Points", "Second Wind"]) }, { title: "Saving Throws", rows: rows(["Strength", "Dexterity", "Constitution"]) }, { type: "skills", title: "Skills", rows: skills }] },
+        { id: "combat", icon: "fa-solid fa-bolt", label: "Combat", sections: [{ title: "Actions", rows: rows(["Longsword", "Second Wind", "Action Surge"]) }] },
+        { id: "inventory", icon: "fa-solid fa-briefcase", label: "Inventory", sections: [{ title: "Inventory", rows: gear }] },
+        { id: "spells", icon: "fa-solid fa-book", label: "Spells", sections: [{ title: "Spells", rows: rows(["Fire Bolt", "Shield", "Magic Missile"]) }] },
+        { id: "features", icon: "fa-solid fa-star", label: "Features", sections: [{ title: "Feats", rows: passive(["Alert", "Tough", "Sentinel"]) }] },
+        { id: "crafting", icon: "fa-solid fa-hammer", label: "Crafting", sections: [{ title: "Crafting", load: craftingLoad }] },
+        { id: "effects", icon: "fa-solid fa-wand-magic-sparkles", label: "Effects", sections: [{ title: "Effects", rows: rows(["Blessed", "Inspired"]) }] }
+      ]
+    };
+    let portraitFlag = null;
+    const actor = {
+      name: "Phoenix Zero",
+      type: "character",
+      img: portrait,
+      system: { details: { level: 1 } },
+      getFlag: () => portraitFlag,
+      setFlag: async (_scope, _key, value) => { portraitFlag = value; return value; }
+    };
+    window.previewActor = actor;
+    const { MobileSheet } = await import("/scripts/sheet/mobile-sheet.mjs");
+    window.previewSheet = new MobileSheet({ actor, buildModel: () => model, onBack: () => {} });
+    window.previewSheet.mount(document.querySelector("#preview"));
+    if (params.has("tab")) document.querySelector(`.vm-ms-tab[data-tab="${params.get("tab")}"]`)?.click();
+    if (params.has("inspect")) {
+      document.querySelectorAll(".vm-ts-inventory-items .vm-ms-row")[Number(params.get("inspect"))]
+        ?.querySelector("[aria-label=info]")?.click();
+    }
+  </script>
+</body>
+</html>

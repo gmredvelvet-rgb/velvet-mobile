@@ -14,7 +14,7 @@
 
 | Requirement | Detail |
 |---|---|
-| Foundry VTT | **v13** minimum (verified). v14-ready by audit — see [Compatibility](#compatibility). |
+| Foundry VTT | **v13** minimum; manifest verified through **v14**. |
 | Subscription | An **active, qualifying Patreon** subscription to [GM RedVelvet](https://www.patreon.com/gmredvelvet), for as long as you use the module — see [Licensing](#licensing). Only the **GM** authorises; players never see a prompt. |
 | Internet | Required while playing. The licence is verified periodically against a licence server. |
 | Device | A touch device (phone/tablet) for the mobile experience. Desktop is used for testing via *Force Phone/Tablet*. |
@@ -72,7 +72,7 @@ The `latest/download` URLs always resolve to the newest published release, so Fo
 | Foundry | Status |
 |---|---|
 | v13 | ✅ **Verified** — developed and tested against v13. |
-| v14 | 🟡 **Ready by audit** — the code was audited against the released v14 API and no longer depends on the internals most likely to move (see [CHANGELOG](CHANGELOG.md) 0.13.0). Not yet run on a live v14 world, so `compatibility.verified` remains `13`. |
+| v14 | **Verified in the module manifest** — the integration uses the released v14 APIs while retaining the v13 compatibility paths. |
 
 ### Game systems
 
@@ -175,7 +175,7 @@ Use the **auth-code** flow in *Manage licence* — connect on any device, copy t
 
 ## Known issues
 
-- `compatibility.verified` is `13`: v14 support is audited but not yet run against a live v14 world.
+- Live behavior still depends on the active game system and its version; unsupported systems use the generic adapter or their native sheet.
 - Systems without a dedicated adapter get the generic one, which reads the actor by data shape. It covers most systems, but a hand-written adapter always reads better — [register your own](#game-systems) if yours deserves one.
 - Pathfinder 2e does not yet expose the roll-option toggles the desktop sheet shows above its strikes (Current Form, Double Slice, Hunt Prey…), exploration activities, or the effects panel. Planned for a future release.
 

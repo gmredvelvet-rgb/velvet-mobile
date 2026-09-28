@@ -768,6 +768,1230 @@
   }
 
   /* ==================================================================== *
+   * Modern RPG — stone, parchment and inventory slots.
+   *
+   * Reuses the visual language of the desktop RPG inventory sheet for the
+   * mobile shell: hard pixel edges, stone ground, dim parchment text and
+   * restrained gold affordances. The layout stays Velvet Mobile's native
+   * phone layout; only the material treatment changes.
+   * ==================================================================== */
+
+  html[data-vm-theme="modern-rpg"] {
+    --vm-surface: rgb(12 9 6 / 0.96);
+    --vm-surface-raised: rgb(31 28 32 / 0.98);
+    --vm-surface-border: rgb(149 117 60 / 0.45);
+    --vm-surface-card: rgb(42 40 51 / 0.72);
+    --vm-hairline: rgb(124 108 78 / 0.32);
+    --vm-sticky-bg: rgb(16 14 17 / 0.97);
+    --vm-text: rgb(230 217 174);
+    --vm-text-dim: rgb(163 144 106);
+    --vm-accent: rgb(224 176 84);
+    --vm-backdrop: rgb(0 0 0 / 0.58);
+    --vm-shadow: 6px 6px 0 rgb(0 0 0 / 0.55);
+    --vm-shadow-side: -6px 6px 0 rgb(0 0 0 / 0.48);
+
+    --vm-radius-sm: 0;
+    --vm-radius-md: 0;
+    --vm-radius-lg: 0;
+    --vm-radius-pill: 0;
+
+    --vm-font-title: "SSAlagard", Georgia, serif;
+    --vm-font-display: "SSAlagard", Georgia, serif;
+    --vm-font-body: "SSPixelOp", Verdana, sans-serif;
+    --vm-font-mono: "SSPixelOp8", "Consolas", monospace;
+    --vm-title-transform: none;
+    --vm-title-spacing: 0;
+    --vm-title-weight: 400;
+
+    --vm-surface-sunken:
+      linear-gradient(45deg, rgb(255 255 255 / 0.025) 25%, transparent 25% 75%, rgb(255 255 255 / 0.025) 75%),
+      linear-gradient(45deg, rgb(0 0 0 / 0.15) 25%, transparent 25% 75%, rgb(0 0 0 / 0.15) 75%),
+      linear-gradient(180deg, rgb(27 26 34) 0%, rgb(12 9 6) 100%);
+    --vm-frame:
+      linear-gradient(rgb(149 117 60 / 0.75), rgb(149 117 60 / 0.75)),
+      linear-gradient(rgb(149 117 60 / 0.75), rgb(149 117 60 / 0.75)),
+      linear-gradient(rgb(149 117 60 / 0.75), rgb(149 117 60 / 0.75)),
+      linear-gradient(rgb(149 117 60 / 0.75), rgb(149 117 60 / 0.75)),
+      linear-gradient(rgb(12 9 6 / 0.9), rgb(12 9 6 / 0.9)),
+      linear-gradient(rgb(12 9 6 / 0.9), rgb(12 9 6 / 0.9)),
+      linear-gradient(rgb(12 9 6 / 0.9), rgb(12 9 6 / 0.9)),
+      linear-gradient(rgb(12 9 6 / 0.9), rgb(12 9 6 / 0.9));
+    --vm-frame-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%, 100% 1px, 100% 1px, 1px 100%, 1px 100%;
+    --vm-frame-pos: 0 0, 0 100%, 0 0, 100% 0, 0 4px, 0 calc(100% - 4px), 4px 0, calc(100% - 4px) 0;
+    --vm-frame-inset:
+      inset 0 0 0 2px rgb(12 9 6 / 0.85),
+      inset 0 0 0 4px rgb(149 117 60 / 0.18);
+
+    --vm-panel:
+      linear-gradient(rgb(149 117 60 / 0.58), rgb(149 117 60 / 0.58)),
+      linear-gradient(rgb(12 9 6), rgb(12 9 6)),
+      linear-gradient(rgb(90 69 39 / 0.55), rgb(90 69 39 / 0.55));
+    --vm-panel-size: 100% 2px, 100% 2px, 100% 2px;
+    --vm-panel-pos: 0 0, 0 100%, 0 calc(100% - 4px);
+
+    --vm-rule-height: 4px;
+    --vm-rule:
+      linear-gradient(90deg, rgb(224 176 84 / 0.75) 0%, rgb(149 117 60 / 0.45) 42%, transparent 100%),
+      linear-gradient(90deg, rgb(12 9 6 / 0.85), transparent);
+    --vm-rule-size: 100% 2px, 100% 1px;
+    --vm-rule-pos: 0 0, 0 100%;
+
+    --vm-bar-clip: none;
+    --vm-glow: rgb(224 176 84 / 0.28);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-nav-view {
+    image-rendering: pixelated;
+    background-size: 32px 32px, 32px 32px, 100% 100%;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet,
+  html[data-vm-theme="modern-rpg"] .vm-nav-body,
+  html[data-vm-theme="modern-rpg"] .vm-status,
+  html[data-vm-theme="modern-rpg"] .vm-cmd {
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-header,
+  html[data-vm-theme="modern-rpg"] .vm-nav-bar,
+  html[data-vm-theme="modern-rpg"] .vm-status,
+  html[data-vm-theme="modern-rpg"] .vm-cmd {
+    border-color: rgb(12 9 6);
+    box-shadow: 0 2px 0 rgb(90 69 39 / 0.35);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-title h1 {
+    color: var(--vm-accent);
+    font-size: 1.28rem;
+    font-weight: 400;
+    text-shadow: 2px 2px 0 rgb(0 0 0 / 0.65);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-subtitle {
+    font-size: 0.9rem;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-portrait,
+  html[data-vm-theme="modern-rpg"] .vm-status-portrait {
+    border: 2px solid rgb(12 9 6);
+    outline: 2px solid rgb(149 117 60 / 0.72);
+    box-shadow: 3px 3px 0 rgb(0 0 0 / 0.55);
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-hp {
+    height: 24px;
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(149 117 60 / 0.55);
+    background: rgb(42 33 24);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-hp-fill {
+    background:
+      linear-gradient(180deg, rgb(118 155 68), rgb(66 102 42));
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-hp-fill.vm-low {
+    background: linear-gradient(180deg, rgb(196 149 64), rgb(121 83 33));
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-hp-fill.vm-critical {
+    background: linear-gradient(180deg, rgb(142 47 42), rgb(81 24 24));
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-section-head {
+    padding-bottom: var(--vm-space-2);
+    box-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-section-head h2 {
+    color: var(--vm-accent);
+    font-size: 1.05rem;
+    font-weight: 400;
+    text-shadow: 2px 2px 0 rgb(0 0 0 / 0.58);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-dnd,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-pf2e,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-cyber,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-hope {
+    margin-bottom: 5px;
+    padding: var(--vm-space-1) var(--vm-space-2);
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(149 117 60 / 0.38);
+    background:
+      linear-gradient(180deg, rgb(42 40 51 / 0.88), rgb(27 26 34 / 0.9));
+    box-shadow: inset 0 1px 0 rgb(230 217 174 / 0.05), 2px 2px 0 rgb(0 0 0 / 0.32);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row:active {
+    outline-color: var(--vm-accent);
+    background:
+      linear-gradient(180deg, rgb(49 45 54 / 0.92), rgb(36 32 35 / 0.94));
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-img,
+  html[data-vm-theme="modern-rpg"] .vm-ms-stat,
+  html[data-vm-theme="modern-rpg"] .vm-ms-ability,
+  html[data-vm-theme="modern-rpg"] .vm-ms-section-badge,
+  html[data-vm-theme="modern-rpg"] .vm-sys-badge,
+  html[data-vm-theme="modern-rpg"] .vm-sys-meta,
+  html[data-vm-theme="modern-rpg"] .vm-combat-init {
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(149 117 60 / 0.34);
+    background: rgb(31 28 32);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-img {
+    image-rendering: pixelated;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-stat-value,
+  html[data-vm-theme="modern-rpg"] .vm-ms-ability-mod,
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-badge {
+    color: var(--vm-accent);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-tab {
+    min-height: calc(38px * var(--vm-scale));
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(124 108 78 / 0.3);
+    background: rgb(31 28 32);
+    color: var(--vm-text-dim);
+    font-size: 1rem;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-tab.vm-active {
+    outline-color: rgb(224 176 84 / 0.78);
+    background:
+      linear-gradient(180deg, rgb(69 53 32), rgb(42 33 24));
+    color: var(--vm-accent);
+    box-shadow: inset 0 0 0 1px rgb(230 217 174 / 0.08);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-action,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-pf2e .vm-ms-row-action,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-cyber .vm-ms-row-action,
+  html[data-vm-theme="modern-rpg"] .vm-sys-row-hope .vm-ms-row-action {
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(149 117 60 / 0.26);
+    background: rgb(42 33 24 / 0.72);
+    color: var(--vm-text-dim);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-action.vm-on,
+  html[data-vm-theme="modern-rpg"] .vm-ms-row-action:active,
+  html[data-vm-theme="modern-rpg"] .vm-cmd-btn.vm-active {
+    color: var(--vm-accent);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-condition {
+    border: 2px solid rgb(12 9 6);
+    outline: 1px solid rgb(149 117 60 / 0.28);
+    background: rgb(31 28 32);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ms-condition.vm-on {
+    outline-color: var(--vm-accent);
+    background: rgb(69 53 32);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-combat-active {
+    outline-color: var(--vm-accent);
+    background: rgb(69 53 32 / 0.7);
+  }
+
+  /* TaleSpire Foundry Sheets: compact one-column composition used by the
+     module's Symbiote layout. This deliberately replaces the generic mobile
+     card treatment above with the source sheet's flat rules and dense rows. */
+  html[data-vm-theme="modern-rpg"] {
+    --vm-surface: #080705;
+    --vm-surface-raised: #14110c;
+    --vm-surface-border: #6b5a33;
+    --vm-surface-card: #17130d;
+    --vm-hairline: #3a3020;
+    --vm-sticky-bg: #0c0a08;
+    --vm-text: #d8c9a6;
+    --vm-text-dim: #8d7f63;
+    --vm-accent: #e2c489;
+    --vm-font-title: Georgia, "Times New Roman", serif;
+    --vm-font-display: Georgia, "Times New Roman", serif;
+    --vm-font-body: Georgia, "Times New Roman", serif;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire {
+    padding-top: var(--vm-safe-top);
+    background:
+      linear-gradient(rgb(8 7 5 / 0.88), rgb(8 7 5 / 0.94)),
+      url("../assets/talespire/ui/stone_tile.png"),
+      #080705;
+    color: var(--vm-text);
+    -webkit-font-smoothing: antialiased;
+    font-smooth: always;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ts-header {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    border-bottom: 1px solid #3a3020;
+    background: #080705;
+    box-shadow: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-windowbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    padding: 0 6px;
+    border-bottom: 1px solid #3a3020;
+    background: linear-gradient(180deg, #17130d, #0d0b08);
+    color: #c9b98d;
+    font-size: 9px;
+    font-variant: small-caps;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-window-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-window-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-window-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #9c8757;
+    font: inherit;
+  }
+
+  html[data-vm-theme="modern-rpg"] button.vm-ts-window-action {
+    cursor: pointer;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-identity {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 54px;
+    padding: 6px 9px;
+    background: linear-gradient(90deg, #15100d 0%, #2a1d14 55%, #15100d 100%);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-level {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-left: 4px;
+    transform: rotate(45deg);
+    border: 1px solid #9c8757;
+    background: linear-gradient(145deg, #241d12, #0e0b07);
+    box-shadow: 0 0 10px #000 inset;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-level > span {
+    transform: rotate(-45deg);
+    color: #f4e2b4;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-nameplate {
+    min-width: 0;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-nameplate h1,
+  html[data-vm-theme="modern-rpg"] .vm-ts-nameplate p {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-nameplate h1 {
+    border: 0;
+    color: #e2c489;
+    font-size: 13px;
+    font-variant: small-caps;
+    line-height: 1.15;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-nameplate p {
+    color: #8d7f63;
+    font-size: 10px;
+    font-style: italic;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-identity-tools {
+    display: flex;
+    gap: 4px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-actor-switcher {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 6px;
+    margin: 0 8px 5px;
+    padding: 5px 7px;
+    border: 1px solid #3a3020;
+    background: #080705cc;
+    color: #9c8757;
+    font-size: 9px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-actor-switcher > span {
+    min-width: 0;
+    overflow: hidden;
+    color: #d8c9a6;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-tool,
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait-tool {
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    min-width: 25px;
+    padding: 0;
+    border: 1px solid #3a3020;
+    background: #14110bd9;
+    color: #9c8757;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] button.vm-ts-portrait-tool { cursor: pointer; }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-header .vm-ms-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    min-height: 0;
+    padding: 0 8px 4px;
+    overflow: visible;
+    border: 0;
+    border-bottom: 1px solid #3a3020;
+    background: #0b0907;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-header .vm-ms-tab {
+    justify-content: flex-start;
+    gap: 5px;
+    min-width: 0;
+    min-height: 27px;
+    padding: 0 7px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #8d7f63;
+    font-size: 10px;
+    font-variant: small-caps;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-header .vm-ms-tab span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-header .vm-ms-tab.vm-active {
+    border-bottom-color: #e2c489;
+    outline: 0;
+    background: linear-gradient(0deg, #2a2116, transparent);
+    color: #f4e2b4;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait {
+    position: relative;
+    height: clamp(104px, 24vw, 132px);
+    overflow: hidden;
+    border-top: 1px solid #6b5a33;
+    border-bottom: 1px solid #6b5a33;
+    background: #070605;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.2));
+    box-shadow: inset 0 0 20px rgb(0 0 0 / 0.72);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait img {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: cover;
+    object-position: center 22%;
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait-tool {
+    position: absolute;
+    top: 6px;
+    z-index: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait-left { left: 7px; }
+  html[data-vm-theme="modern-rpg"] .vm-ts-portrait-right { right: 7px; }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-ability-strip {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 3px;
+    padding: 3px 8px 5px;
+    background: #080705;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-ability {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 27px;
+    padding: 1px 2px;
+    border: 1px solid #221c13;
+    outline: 0;
+    background: #111014;
+    color: #d8c9a6;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-ability-mod {
+    color: #e2c489;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-ability-label {
+    max-width: 100%;
+    overflow: hidden;
+    color: #6f654f;
+    font-size: 7px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-health {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(90px, 1fr);
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-health .vm-ms-hp {
+    height: 25px;
+    border: 1px solid #3b160f;
+    outline: 1px solid #5d2a20;
+    background: #1a0c09;
+    box-shadow: inset 0 1px rgb(255 255 255 / 0.04);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-health .vm-ms-hp-fill,
+  html[data-vm-theme="modern-rpg"] .vm-ts-health .vm-ms-hp-fill.vm-low,
+  html[data-vm-theme="modern-rpg"] .vm-ts-health .vm-ms-hp-fill.vm-critical {
+    background: linear-gradient(180deg, #a83228, #5e1c16);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-health .vm-ms-hp-text::before {
+    content: "HP  ";
+    color: #f4e2b4;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-temp-hp {
+    display: grid;
+    place-items: center;
+    grid-template-rows: auto auto;
+    min-width: 0;
+    padding: 2px 8px;
+    border: 1px solid #272737;
+    background: #11121a;
+    color: #9b9baa;
+    font-family: inherit;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-temp-hp span {
+    font-size: 8px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-temp-hp b {
+    color: #d8c9a6;
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-health-rule {
+    height: 10px;
+    margin: 0 8px 4px;
+    border: 1px solid #242015;
+    background: #060504;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body {
+    padding: 0 9px calc(var(--vm-safe-bottom) + var(--vm-cmd-h) + 12px);
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #8f7440 #100d09;
+    background: linear-gradient(180deg, #0c0a08, #080705);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body::-webkit-scrollbar-track {
+    background: #100d09;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body::-webkit-scrollbar-thumb {
+    border: 1px solid #100d09;
+    background: #8f7440;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-paperdoll {
+    position: relative;
+    width: min(100%, 430px);
+    aspect-ratio: 1 / 1;
+    margin: 0 auto 5px;
+    overflow: hidden;
+    border-bottom: 1px solid #3a3020;
+    /* A warm glow behind the portrait: cut-out art (transparent PNG) of a
+       dark-clad figure would otherwise vanish into the black. */
+    background:
+      radial-gradient(ellipse 62% 70% at 50% 42%, rgb(120 94 58 / 0.55), rgb(48 38 24 / 0.35) 55%, transparent 80%),
+      #0b0907;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-paperdoll::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 48%, rgb(0 0 0 / 0.5) 100%);
+  }
+
+  /* The portrait, as bright as the original sheet shows it: the slot frames
+     carry their own contrast, so the art needs no heavy dimming. */
+  html[data-vm-theme="modern-rpg"] .vm-ts-paperdoll-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: cover;
+    object-position: center 22%;
+    filter: brightness(0.85);
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-paperdoll-tray {
+    position: absolute;
+    left: 26.1%;
+    top: 85%;
+    z-index: 2;
+    width: 49%;
+    height: 14.5%;
+    border: 0;
+    object-fit: fill;
+    image-rendering: pixelated;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot {
+    position: absolute;
+    left: var(--ts-x);
+    top: var(--ts-y);
+    z-index: 3;
+    width: var(--ts-w);
+    height: var(--ts-h);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #8d7f63;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-frame,
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-art,
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-item {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: contain;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-frame {
+    z-index: 1;
+    image-rendering: pixelated;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-art {
+    z-index: 2;
+    transform: scale(0.58);
+    filter: sepia(0.35) brightness(0.62);
+    opacity: 0.48;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-item {
+    z-index: 3;
+    transform: scale(0.82);
+    filter: drop-shadow(0 2px 2px #000);
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot.vm-filled .vm-ts-slot-art {
+    opacity: 0.12;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-label {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    z-index: 4;
+    max-width: 96%;
+    overflow: hidden;
+    transform: translateX(-50%);
+    color: #8d7f63;
+    font-size: 6px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot.vm-filled .vm-ts-slot-label {
+    opacity: 0;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot[data-slot^="belt"] .vm-ts-slot-label {
+    display: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot-qty {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    z-index: 5;
+    min-width: 12px;
+    padding: 1px 2px;
+    background: #080705e6;
+    color: #f4e2b4;
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-slot:active {
+    filter: brightness(1.35);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-tools {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 7px;
+    padding: 0 1px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-coins {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-coin {
+    display: grid;
+    place-items: center;
+    min-height: 35px;
+    border: 1px solid #242015;
+    background: #11121a;
+    line-height: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-coin b {
+    color: #f4e2b4;
+    font-size: 11px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-coin span {
+    color: #d7aa50;
+    font-size: 8px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 3px 5px;
+    border: 1px solid #3a3020;
+    background: #0b0907;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-filter {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    min-width: 27px;
+    height: 25px;
+    min-height: 25px;
+    padding: 0;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #8d7f63;
+    font-size: 10px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-filter.vm-active {
+    border-bottom-color: #e2c489;
+    color: #f4e2b4;
+    background: #2a2116;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-attunement {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 3px 8px;
+    border: 1px solid #3a3020;
+    color: #d7aa50;
+    font-size: 9px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-search {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 0 7px;
+    border: 1px solid #3a3020;
+    background: #11121a;
+    color: #8d7f63;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-search input {
+    width: 100%;
+    height: 27px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #d8c9a6;
+    font-family: inherit;
+    font-size: 10px;
+    font-style: italic;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-section {
+    margin: 0 0 7px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-section-head {
+    position: static;
+    min-height: 23px;
+    margin: 0;
+    padding: 6px 0 3px;
+    border-bottom: 1px solid #3a3020;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-section-head h2 {
+    color: #c9a968;
+    font-size: 9px;
+    font-variant: small-caps;
+    font-weight: 700;
+    text-shadow: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-section-badge,
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-sys-badge {
+    padding: 1px 5px;
+    border: 1px solid #3a3020;
+    outline: 0;
+    background: #14110c;
+    color: #c9b98d;
+    font-size: 9px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-sys-row-talespire {
+    margin: 0;
+    padding: 3px 0;
+    border: 0;
+    border-bottom: 1px solid #211c13;
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-sys-row-talespire:active {
+    outline: 0;
+    background: #ffffff08;
+  }
+
+  /* Skills are short rows: two reading columns even on a phone, the way
+     sheet.css lays out every section on wide screens. */
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body[data-tab="skills"] .vm-ms-section {
+    columns: 2;
+    column-gap: 12px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body[data-tab="skills"] .vm-ms-section-head {
+    column-span: all;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body[data-tab="skills"] .vm-ms-row {
+    break-inside: avoid;
+  }
+
+  /* A half-width column cannot fit every lore ("Lore: Gladiatorial"):
+     wrap it rather than cut it. */
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-body[data-tab="skills"] .vm-ms-row-label {
+    white-space: normal;
+  }
+
+  /* The height the columns save goes to the portrait. */
+  html[data-vm-theme="modern-rpg"] .vm-ts-header[data-tab="skills"] .vm-ts-portrait {
+    height: clamp(160px, 46vw, 220px);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding: 0 1px 4px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-ms-section-head,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-ms-empty {
+    grid-column: 1 / -1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-row-talespire {
+    position: relative;
+    aspect-ratio: 1 / 1.12;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #3a3020;
+    background:
+      linear-gradient(rgb(8 7 5 / 0.3), rgb(8 7 5 / 0.3)),
+      url("../assets/talespire/ui/cell.png") center / 100% 100% no-repeat,
+      #0c0a08;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-line,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-line-content,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-talespire-main,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-ms-row-main {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ts-inventory-items .vm-ms-row-img {
+    position: absolute;
+    inset: 5% 5% 31%;
+    width: 90%;
+    height: 64%;
+    border: 0;
+    outline: 0;
+    object-fit: contain;
+    background: transparent;
+    transform: scale(1.08);
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-ms-row-text,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-subline,
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-badge {
+    display: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items .vm-sys-line-actions {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    left: 4px;
+    z-index: 4;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ts-inventory-items .vm-ms-row-action {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-color: #587a9a;
+    border-radius: 2px;
+    background: rgb(13 34 52 / 0.82);
+    color: #d8e8f6;
+    font-size: 11px;
+    opacity: 0.92;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ts-inventory-items .vm-ms-row-action:active {
+    opacity: 1;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-sys-talespire-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-width: 0;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-sys-talespire-main .vm-ms-row-main {
+    min-height: 34px;
+    padding: 0 4px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-sys-talespire-main .vm-ms-row-img {
+    width: 27px;
+    height: 27px;
+    border: 1px solid #3a3020;
+    outline: 0;
+    background: #14110c;
+    image-rendering: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-sys-talespire-main .vm-ms-row-label {
+    color: #d8c9a6;
+    font-size: 11px;
+    font-variant: small-caps;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-sys-talespire-main .vm-sys-subline {
+    grid-column: 1 / -1;
+    padding-left: 36px;
+    color: #8d7f63;
+    font-size: 9px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-row-action {
+    width: 27px;
+    height: 27px;
+    padding: 0;
+    border: 1px solid #4b3e28;
+    outline: 0;
+    background: #11121a;
+    color: #a9bdd4;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-row-action-label {
+    display: none;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-condition {
+    border: 1px solid #3a3020;
+    outline: 0;
+    background: #14110c;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-msheet-talespire .vm-ms-condition.vm-on {
+    border-color: #9c8757;
+    outline: 0;
+    background: #2a2116;
+  }
+
+  /* Item inspector — the modal the ⓘ button opens, after the original's. */
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector {
+    box-sizing: border-box;
+    width: min(420px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: calc(var(--vm-vvh, 100dvh) - 32px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #9c8757;
+    border-radius: 4px;
+    background: #14110c;
+    color: #ddd0b3;
+    box-shadow: 0 18px 60px rgb(0 0 0 / 0.75);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-bottom: 1px solid #3a3020;
+    background: #1c1810;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-header img {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    border: 1px solid #3a3020;
+    object-fit: contain;
+    background: #0c0a08;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-title {
+    display: grid;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-title small {
+    color: #8d7f63;
+    font-size: 11px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-title h2 {
+    margin: 0;
+    border: 0;
+    color: #e2c489;
+    font-size: 17px;
+    font-variant: small-caps;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-badge {
+    color: #c9b27a;
+    font-size: 11px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-close {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #3a3020;
+    border-radius: 2px;
+    background: #0c0a08;
+    color: #ddd0b3;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-body {
+    flex: 1 1 auto;
+    min-height: 80px;
+    padding: 12px 14px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    overflow-wrap: anywhere;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-body img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-body table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-body a {
+    color: #d8b877;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid #3a3020;
+    background: #1c1810;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector-footer button {
+    display: inline-flex;
+    flex: 1 1 120px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 4px 10px;
+    border: 1px solid #587a9a;
+    border-radius: 2px;
+    background: rgb(13 34 52 / 0.82);
+    color: #d8e8f6;
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  html[data-vm-theme="modern-rpg"] .vm-ts-inspector button:active {
+    filter: brightness(1.3);
+  }
+
+  @media (min-width: 560px) {
+    html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 340px) {
+    html[data-vm-theme="modern-rpg"] .vm-ts-window-action > span,
+    html[data-vm-theme="modern-rpg"] .vm-ts-tool:last-child {
+      display: none;
+    }
+
+    html[data-vm-theme="modern-rpg"] .vm-ts-header .vm-ms-tabs {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    html[data-vm-theme="modern-rpg"] .vm-ts-inventory-items {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ==================================================================== *
    * Hopefinder Survivor Sheet — stencilled olive, stamped metal, film grain.
    *
    * Signature: a hairline of light across the top of every panel, headings

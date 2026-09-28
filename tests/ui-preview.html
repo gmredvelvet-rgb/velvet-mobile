@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es" data-vm-active data-vm-device="phone" data-vm-sheet-only data-vm-theme="modern-rpg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Velvet Mobile - Control preview</title>
+  <link rel="stylesheet" href="/foundry/css/foundry2.css">
+  <link rel="stylesheet" href="/foundry/fonts/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/styles/tokens.css">
+  <link rel="stylesheet" href="/styles/base.css">
+  <link rel="stylesheet" href="/styles/components.css">
+  <link rel="stylesheet" href="/styles/shell.css">
+  <link rel="stylesheet" href="/styles/sheet.css">
+  <link rel="stylesheet" href="/styles/themes.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #18181c; color: #eee; font: 16px system-ui; }
+    button, input, select { font: inherit; }
+    main { max-width: 720px; margin: auto; padding: 24px 16px 90px; }
+    main h1 { font-size: 24px; color: inherit; }
+    main button { min-height: 44px; padding: 10px 16px; }
+    #result { display: block; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Modern RPG</h1>
+    <button id="settings">Ajustes</button>
+    <label><input id="fail" type="checkbox"> Simular fallo de guardado</label>
+    <output id="result" aria-live="polite"></output>
+  </main>
+  <script type="module">
+    import { CommandBar } from '/scripts/shell/command-bar.mjs';
+    import { MobileSettings } from '/scripts/shell/mobile-settings.mjs';
+    import { Settings } from '/scripts/core/settings.mjs';
+    import { Theme } from '/scripts/core/theme.mjs';
+    const locale = await (await fetch('/lang/es.json')).json();
+    const entries = new Map();
+    const values = new Map();
+    const result = document.querySelector('#result');
+    window.foundry = { data: { fields: {} } };
+    window.ui = { notifications: { error: (message) => { result.textContent = message; } } };
+    window.game = {
+      system: { id: 'dnd5e', title: 'Dungeons & Dragons' },
+      user: { id: 'gm-1', name: 'Game Master', isGM: true, can: () => true, hasRole: () => true },
+      users: { contents: [
+        { id: 'gm-1', name: 'Game Master', isGM: true },
+        { id: 'player-1', name: 'Alice', isGM: false },
+        { id: 'player-2', name: 'Bob', isGM: false }
+      ] },
+      modules: new Map([
+        ['velvet-license-hub', { active: true }],
+        ['velvet-mobile', { id: 'velvet-mobile', title: 'Velvet Mobile' }]
+      ]),
+      i18n: { localize: (key, data) => {
+        const value = key.split('.').reduce((v, k) => v?.[k], locale) ?? ({Close: 'Cerrar', 'PACKAGECONFIG.TABS.core': 'Foundry VTT'}[key] ?? key);
+        return Object.entries(data ?? {}).reduce((text, [name, replacement]) => text.replaceAll(`{${name}}`, replacement), value);
+      } },
+      settings: {
+        settings: entries, menus: new Map(),
+        register: (namespace, key, spec) => {
+          entries.set(`${namespace}.${key}`, { ...spec, namespace, key });
+          values.set(`${namespace}.${key}`, spec.default);
+        },
+        get: (namespace, key) => values.get(`${namespace}.${key}`),
+        set: async (namespace, key, value) => {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          if (document.querySelector('#fail').checked) throw new Error('Guardado rechazado (simulacion)');
+          values.set(`${namespace}.${key}`, value);
+          entries.get(`${namespace}.${key}`).onChange?.(value);
+          result.textContent = `${key}: ${value}`;
+          return value;
+        }
+      }
+    };
+    Settings.register({ onThemeChange: () => Theme.apply(), onScaleChange: (value) => document.documentElement.style.setProperty('--vm-scale', value) });
+    Settings.registerPlayerModes(); // as main.mjs does at ready
+    values.set('velvet-mobile.theme', 'modern-rpg');
+    game.settings.register('core', 'volume', { name: 'Volumen', type: Number, default: 0.5, config: true, scope: 'client', range: {min: 0, max: 1, step: 0.05} });
+    let settings;
+    document.querySelector('#settings').onclick = () => { settings ??= new MobileSettings({ onDismiss: () => { settings = null; } }).open(); };
+    const names = ['sheet', 'move', 'chat', 'combat', 'target', 'dice'];
+    const labels = ['Hoja', 'Mover', 'Chat', 'Combate', 'Objetivos', 'Dados'];
+    const icons = ['user', 'gamepad', 'comments', 'swords', 'crosshairs', 'dice-d20'];
+    const bar = new CommandBar({ actions: names.map((name, index) => ({
+      name, label: labels[index], icon: `fa-solid fa-${icons[index]}`,
+      onTap: () => { bar.setActive(name, true); result.textContent = labels[index]; }
+    })) }).mount();
+    bar.setActive('sheet', true);
+    bar.setActive('target', true);
+    bar.setBadge('dice', true);
+  </script>
+</body>
+</html>

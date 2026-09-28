@@ -8,7 +8,7 @@
  * @module sheet/adapters/shared
  */
 
-import { L10N } from "../../core/constants.mjs";
+import { L10N, MODULE_ID } from "../../core/constants.mjs";
 import { Logger } from "../../core/logger.mjs";
 
 /** Localize a `VELVETMOBILE.Sheet.*` key. @param {string} key @returns {string} */
@@ -44,6 +44,131 @@ export const titleCase = (value) => String(value ?? "")
   .replace(/[-_]+/g, " ")
   .replace(/\b\w/g, (c) => c.toUpperCase())
   .trim();
+
+const TALESPIRE_ASSETS = "modules/velvet-mobile/assets/talespire/slots";
+const PAPER_DOLL_SLOTS = Object.freeze([
+  ["main", "Main Hand", "hand", 0, 2, 17.5, 43],
+  ["off", "Off Hand", "hand", 82.5, 2, 17.5, 43],
+  ["head", "Head", "head", 39, 0, 22, 19],
+  ["body", "Armor", "body", 38.5, 20, 23, 29],
+  ["belt", "Belt", "belt", 37.5, 50.5, 25, 9],
+  ["amulet", "Amulet", "amulet", 65, 1.5, 13, 15],
+  ["ring1", "Ring", "ring", 22, 27, 11.5, 12.5],
+  ["ring2", "Ring", "ring", 66, 37.5, 11.5, 12.5],
+  ["gloves", "Gloves", "gloves", 17, 61, 20, 17],
+  ["cape", "Cape", "cape", 0.5, 59.5, 15, 20],
+  ["boots", "Boots", "boots", 63, 61, 20, 17],
+  ["ranged", "Ranged", "hand", 83, 49, 17, 31],
+  ...[1, 2, 3, 4, 5].map((n, i) => [`belt${n}`, `Quick Slot ${n}`, null, 26.1 + i * 9.8, 85, 9.8, 14.5])
+]);
+
+/** Paper-doll slots shared by the TaleSpire D&D and PF2e sheets. */
+export function paperDollOf(actor, systemId = game.system?.id ?? "") {
+  const items = actor.items?.contents ?? [...(actor.items ?? [])];
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const flagKey = systemId === "pf2e" ? "paperDollSlotsPf2e" : "paperDollSlotsDnd5e";
+  let saved = {};
+  try {
+    saved = actor.getFlag?.(MODULE_ID, flagKey) ?? {};
+  } catch { /* A read-only actor still gets automatic equipped-item placement. */ }
+
+  const used = new Set();
+  const equipped = items.filter((item) => item.isEquipped === true || item.system?.equipped === true);
+  const textOf = (item) => `${item.name ?? ""} ${item.type ?? ""} ${item.system?.type?.value ?? ""} ${item.system?.category ?? ""}`.toLowerCase();
+  const take = (test) => {
+    const item = equipped.find((candidate) => !used.has(candidate.id) && test(candidate));
+    if (item) used.add(item.id);
+    return item ?? null;
+  };
+  const isWeapon = (item) => item.type === "weapon";
+  const isRanged = (item) => isWeapon(item) && (item.system?.range?.increment || item.system?.range?.long || /bow|crossbow|sling|ranged/.test(textOf(item)));
+  const isShield = (item) => item.type === "shield" || /shield/.test(textOf(item));
+  const findFallback = (key) => {
+    if (key === "main") return take((item) => isWeapon(item) && !isRanged(item));
+    if (key === "off") return take((item) => isShield(item) || isWeapon(item));
+    if (key === "ranged") return take(isRanged);
+    if (key === "body") return take((item) => ["armor", "equipment"].includes(item.type) && !isShield(item) && !/head|helm|boot|glove|cloak|cape|belt|ring|amulet|neck/.test(textOf(item)));
+    const patterns = {
+      head: /head|helm|hat|crown/,
+      belt: /belt|waist/,
+      amulet: /amulet|neck|pendant/,
+      ring1: /ring/,
+      ring2: /ring/,
+      gloves: /glove|gauntlet|handwrap/,
+      cape: /cape|cloak|mantle/,
+      boots: /boot|shoe|footwear/
+    };
+    return patterns[key] ? take((item) => patterns[key].test(textOf(item))) : null;
+  };
+
+  const slots = PAPER_DOLL_SLOTS.map(([key, label, frame, x, y, w, h]) => {
+    const hasAssignment = Object.hasOwn(saved, key);
+    const assigned = hasAssignment ? byId.get(saved[key]) : null;
+    if (assigned) used.add(assigned.id);
+    const item = hasAssignment ? assigned : findFallback(key);
+    const artKey = frame === "ring" ? "ring.svg" : key === "ranged" ? "ranged.svg" : frame ? `art-${frame}.png` : "";
+    return {
+      key, label, x, y, w, h,
+      frame: frame ? `${TALESPIRE_ASSETS}/frame-${frame}.png` : "",
+      art: artKey ? `${TALESPIRE_ASSETS}/${artKey}` : "",
+      item: item ? {
+        id: item.id,
+        name: item.name,
+        img: item.img,
+        qty: Number(item.system?.quantity) > 1 ? Number(item.system.quantity) : null,
+        onTap: safe(() => item.sheet?.render(true))
+      } : null
+    };
+  });
+  const coins = actor.inventory?.coins ?? actor.system?.currency ?? {};
+  const currency = ["pp", "gp", "sp", "cp"].map((key) => ({
+    key,
+    value: Number(coins[key]?.value ?? coins[key] ?? 0) || 0
+  }));
+  const invested = items.filter((item) => item.isInvested === true || item.system?.attuned === true || item.system?.attunement === 2).length;
+  const candidates = items
+    .filter((item) => ["weapon", "armor", "shield", "equipment", "consumable", "tool"].includes(item.type))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((item) => ({ id: item.id, name: item.name, img: item.img, type: item.type }));
+  return {
+    backdrop: actor.img,
+    slots,
+    slottedIds: [...used],
+    currency,
+    attunement: { value: invested, max: systemId === "pf2e" ? 10 : 3 },
+    candidates,
+    assign: safe(async (slotKey, itemId) => {
+      if (!actor.isOwner && actor.isOwner !== undefined) return;
+      const next = { ...saved, [slotKey]: itemId || null };
+      await actor.setFlag(MODULE_ID, flagKey, next);
+    }),
+    openItem: safe((itemId) => byId.get(itemId)?.sheet?.render(true))
+  };
+}
+
+/** Biography fields exposed for the TaleSpire layout without system HTML assumptions. */
+export function biographyRows(actor) {
+  const biography = actor.system?.details?.biography;
+  const fields = typeof biography === "string"
+    ? [["Biography", biography]]
+    : [
+        ["Backstory", biography?.value ?? biography?.backstory],
+        ["Appearance", biography?.appearance],
+        ["Personality Traits", biography?.traits],
+        ["Ideals", biography?.ideals],
+        ["Bonds", biography?.bonds],
+        ["Flaws", biography?.flaws],
+        ["Campaign Notes", biography?.campaignNotes]
+      ];
+  return fields
+    .filter(([, value]) => typeof value === "string" && value.trim())
+    .map(([label, value], index) => ({
+      id: `biography-${index}`,
+      label,
+      sub: "",
+      description: async () => value
+    }));
+}
 
 /**
  * CONFIG label entries are plain strings in old systems and objects in new
@@ -395,12 +520,15 @@ export const restSection = (rows) => (rows.length ? [{ title: t("Rest"), rows }]
  *
  * @param {Actor} actor
  * @param {Item} item
+ * @param {object} [options]
+ * @param {boolean} [options.card]  False when the system has no card for
+ *                                  this item, so asking it for one throws.
  * @returns {Promise<*>}
  */
-export const sendToChat = async (actor, item) => {
-  if (typeof item.displayCard === "function") return item.displayCard();
-  if (typeof item.toMessage === "function") return item.toMessage();
-  if (typeof item.toChat === "function") return item.toChat();
+export const sendToChat = async (actor, item, { card = true } = {}) => {
+  if (card && typeof item.displayCard === "function") return item.displayCard();
+  if (card && typeof item.toMessage === "function") return item.toMessage();
+  if (card && typeof item.toChat === "function") return item.toChat();
   const description = await describe(item)();
   return ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -416,15 +544,16 @@ export const sendToChat = async (actor, item) => {
  * @param {Actor} actor
  * @param {Item} item
  * @param {object[]} [extras]  System-specific entries, placed after "chat".
+ * @param {object} [options]   Passed on to sendToChat.
  * @returns {object[]} Menu entries, or none when there is nothing to offer.
  */
-export const itemMenu = (actor, item, extras = []) => {
+export const itemMenu = (actor, item, extras = [], options = {}) => {
   if (!item) return [];
   const entries = [{
     id: "chat",
     icon: "fa-solid fa-comment",
     label: t("SendToChat"),
-    onTap: safe(() => sendToChat(actor, item))
+    onTap: safe(() => sendToChat(actor, item, options))
   }];
   entries.push(...extras.filter(Boolean));
   // Editing needs both a sheet to open and the right to change the item.

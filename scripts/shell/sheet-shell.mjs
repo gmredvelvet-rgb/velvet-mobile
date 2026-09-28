@@ -99,9 +99,6 @@ export class SheetShell {
   /** @type {Set<string>} Actors whose mobile sheet crashed — use the native sheet instead. */
   #msheetFailed = new Set();
 
-  /** @type {(() => void)|null} Restores the app's setPosition. */
-  #unpinApp = null;
-
   /** @type {(() => void)[]} Gesture unsubscribers tied to the pinned sheet. */
   #drawerGestures = [];
 
@@ -161,6 +158,9 @@ export class SheetShell {
 
   /** @type {number|null} Fade timer for the toast. */
   #toastTimer = null;
+
+  /** @type {object|null} Canvas ticker stopped by this shell, if any. */
+  #stoppedTicker = null;
 
   /** @param {object} profile @returns {boolean} */
   shouldEnable(profile) {
@@ -524,15 +524,9 @@ export class SheetShell {
     element.classList.add(PINNED_CLS);
     document.documentElement.setAttribute(ROOT_ATTRS.DRAWER, "");
     this.#commands?.setActive("sheet", true);
-    // Neutralize self-positioning so nothing fights the fullscreen CSS.
-    if (!this.#unpinApp) {
-      const original = app.setPosition;
-      app.setPosition = () => app.position;
-      this.#unpinApp = () => {
-        app.setPosition = original;
-        SheetShell.#elementOf(app)?.classList.remove(PINNED_CLS);
-      };
-    }
+    // Fullscreen geometry is enforced by the .vm-pinned CSS rules. Keeping
+    // the application's public setPosition method intact avoids changing its
+    // behavior for the system that owns the sheet.
     this.#injectBackBar(element);
     this.#slideIn(element);
     const off = services.gestures?.on(element, "swipe", (g) => this.#onTabSwipe(g));
@@ -549,9 +543,9 @@ export class SheetShell {
   #undecorate() {
     for (const off of this.#drawerGestures) off();
     this.#drawerGestures.length = 0;
-    SheetShell.#elementOf(this.#app)?.querySelector(`.${CLS}-pinned-bar`)?.remove();
-    this.#unpinApp?.();
-    this.#unpinApp = null;
+    const element = SheetShell.#elementOf(this.#app);
+    element?.querySelector(`.${CLS}-pinned-bar`)?.remove();
+    element?.classList.remove(PINNED_CLS);
     this.#app = null;
     this.#commands?.setActive("sheet", false);
     // Only the pinned app owned this attribute if no stack view is up; the
@@ -694,8 +688,8 @@ export class SheetShell {
 
     this.#nav = new NavStack().mount();
 
-    // Priority order: the first five get a slot, the rest go to the overflow
-    // menu. Targeting and movement only exist where there is a map to use
+    // Priority order: four commands plus More when overflow is needed.
+    // Targeting and movement only exist where there is a map to use
     // them on, so a canvas-less table gets a shorter — and complete — bar.
     const actions = [
       { name: "sheet", icon: "fa-solid fa-user", label: t("Sheet"), onTap: () => this.openSheet() },
@@ -1553,8 +1547,10 @@ export class SheetShell {
     try {
       const api = foundry.applications?.api;
       const DocumentSheetV2 = api?.DocumentSheetV2;
-      const registry = foundry.applications?.instances ?? api?.ApplicationV2?.instances;
-      const open = typeof registry === "function" ? registry() : registry?.values?.();
+      // Call the public static generator as a method so its `this` remains
+      // ApplicationV2; older transitional builds fall back to the registry.
+      const open = api?.ApplicationV2?.instances?.()
+        ?? foundry.applications?.instances?.values?.();
       if (DocumentSheetV2 && open) {
         for (const app of open) {
           if (app instanceof DocumentSheetV2) app.close?.({ animate: false });
@@ -1596,9 +1592,18 @@ export class SheetShell {
   #freezeCanvas(freeze) {
     try {
       const ticker = canvas?.app?.ticker;
-      if (!ticker) return;
-      if (freeze && ticker.started) ticker.stop();
-      else if (!freeze && !ticker.started) ticker.start();
+      if (freeze) {
+        if (!ticker?.started) return;
+        ticker.stop();
+        this.#stoppedTicker = ticker;
+        return;
+      }
+
+      // Resume only a ticker this module actually stopped. A paused canvas
+      // may belong to core or another module and must stay paused.
+      const stopped = this.#stoppedTicker;
+      this.#stoppedTicker = null;
+      if (stopped && !stopped.started) stopped.start();
     } catch (err) {
       Logger.debug("Could not toggle canvas ticker", err);
     }

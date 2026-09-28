@@ -41,7 +41,13 @@ export class ServiceRegistry {
    */
   reconcile(profile) {
     for (const entry of this.#entries.values()) {
-      const wanted = entry.service.shouldEnable(profile);
+      let wanted;
+      try {
+        wanted = Boolean(entry.service.shouldEnable(profile));
+      } catch (err) {
+        Logger.error(`Service "${entry.service.name}" failed to evaluate`, err);
+        continue;
+      }
       if (wanted === entry.enabled) continue;
       try {
         wanted ? entry.service.enable() : entry.service.disable();
@@ -49,6 +55,16 @@ export class ServiceRegistry {
         Logger.debug(`Service "${entry.service.name}" ${wanted ? "enabled" : "disabled"}`);
       } catch (err) {
         Logger.error(`Service "${entry.service.name}" failed to ${wanted ? "enable" : "disable"}`, err);
+        // An enable may fail after installing only part of its listeners or
+        // DOM. Give the service its normal symmetric cleanup path before the
+        // next reconciliation attempts it again.
+        if (wanted) {
+          try {
+            entry.service.disable();
+          } catch (cleanupErr) {
+            Logger.error(`Service "${entry.service.name}" failed to roll back`, cleanupErr);
+          }
+        }
       }
     }
   }
@@ -65,10 +81,11 @@ export class ServiceRegistry {
     if (entry.enabled) {
       try {
         entry.service.disable();
+        entry.enabled = false;
       } catch (err) {
         Logger.error(`Service "${name}" failed to disable during restart`, err);
+        return;
       }
-      entry.enabled = false;
     }
     this.reconcile(profile);
   }
@@ -87,10 +104,10 @@ export class ServiceRegistry {
       if (!entry.enabled) continue;
       try {
         entry.service.disable();
+        entry.enabled = false;
       } catch (err) {
         Logger.error(`Service "${entry.service.name}" failed to disable`, err);
       }
-      entry.enabled = false;
     }
   }
 }

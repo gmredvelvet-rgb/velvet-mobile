@@ -8,8 +8,8 @@
  */
 
 import {
-  attempt, conditionsOf, conditionsSection, describe, effectsTab, formatDuration, hpOf, itemMenu, labelOf,
-  makeApplyHp, makeApplyTempHp, num, restRows, restSection, safe, signed, t, text
+  attempt, biographyRows, conditionsOf, conditionsSection, describe, effectsTab, formatDuration, hpOf, itemMenu, labelOf,
+  makeApplyHp, makeApplyTempHp, num, paperDollOf, restRows, restSection, safe, signed, t, text
 } from "./shared.mjs";
 
 /** Actor types this adapter renders. */
@@ -24,6 +24,20 @@ const roll5e = (modern, legacy) => safe(async () => {
     throw err;
   }
 });
+
+/**
+ * Whether using an item does more than post its card. Since v4 that takes an
+ * activity the actor can use — without one, Item5e#use just calls
+ * displayCard, which "Send to chat" already offers. Before v4: an activation.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+const usable5e = (item) => {
+  const activities = item?.system?.activities;
+  if (activities) return activities.filter((activity) => activity.canUse).length > 0;
+  const activation = item?.system?.activation?.type;
+  return Boolean(activation) && activation !== "none";
+};
 
 /** Preparation states, with the system's own numbers as the fallback. */
 const PREP_STATE = () => CONFIG.DND5E?.spellPreparationStates ?? {};
@@ -268,7 +282,7 @@ export function model(actor) {
       label: item.name,
       sub: [item.labels?.toHit, item.labels?.damage].filter(Boolean).join(" · "),
       badge: item.system?.equipped ? "✓" : "",
-      onTap: safe(() => item.use()),
+      onTap: usable5e(item) ? safe(() => item.use()) : undefined,
       menu: itemMenu(actor, item),
       description: describe(item)
     })), []);
@@ -290,7 +304,7 @@ export function model(actor) {
         label: item.name,
         sub: item.system?.type?.label ?? item.type,
         badge,
-        onTap: safe(() => item.use()),
+        onTap: usable5e(item) ? safe(() => item.use()) : undefined,
         actions: equippable ? [{
           icon: "fa-solid fa-shield-halved",
           label: t("Equip"),
@@ -300,6 +314,7 @@ export function model(actor) {
         description: describe(item)
       };
     }), []);
+  const paperDoll = attempt("paper doll", () => paperDollOf(actor, "dnd5e"), null);
 
   /* Spells grouped by level, with slots */
   const spellSections = attempt("spells", () => {
@@ -363,6 +378,7 @@ export function model(actor) {
      CONFIG.statusEffects, so the shared helper already offers the right set. */
   const conditions = attempt("conditions", () => conditionsOf(actor), []);
   const effects = attempt("effects", () => effectRows(actor), []);
+  const biography = attempt("biography", () => biographyRows(actor), []);
 
   /* Rests. Both open the system's own dialog, so hit dice and the rest of
      the bookkeeping stay dnd5e's business rather than ours. */
@@ -389,7 +405,9 @@ export function model(actor) {
     img: item.img,
     label: item.name,
     sub: item.system?.type?.label ?? "",
-    onTap: safe(() => (item.displayCard ? item.displayCard() : item.use())),
+    // Second Wind, Rage… run their activity; passive features have nothing
+    // to use, so a tap shows the description and the menu posts the card.
+    onTap: usable5e(item) ? safe(() => item.use()) : undefined,
     menu: itemMenu(actor, item),
     description: describe(item)
   })), []);
@@ -402,7 +420,7 @@ export function model(actor) {
       sections: [
         { type: "abilities", abilities },
         ...restSection(rests),
-        { title: t("Skills"), rows: skills }
+        { type: "skills", title: t("Skills"), rows: skills }
       ]
     },
     {
@@ -445,6 +463,8 @@ export function model(actor) {
       { label: t("Speed"), value: `${system.attributes?.movement?.walk ?? 0}` },
       { label: t("Proficiency"), value: signed(system.attributes?.prof ?? 0) }
     ],
+    paperDoll,
+    biography,
     tabs
   };
 }

@@ -51,6 +51,7 @@ const SK = Object.freeze({
 const HEARTBEAT_MS = 15 * 60 * 1000;
 const FIRST_HEARTBEAT_MS = 60 * 1000;
 const GRACE_MS = 5 * 60 * 1000;
+const API_TIMEOUT_MS = 20 * 1000;
 
 /**
  * Codes that are an actual verdict on entitlement: the subscription ended, the
@@ -243,7 +244,7 @@ export class LicenseClient {
       let interval = null;
 
       const handler = async (event) => {
-        if (event.origin !== expectedOrigin || event.data?.type !== "vnd-auth-code") return;
+        if (event.source !== popup || event.origin !== expectedOrigin || event.data?.type !== "vnd-auth-code") return;
         window.removeEventListener("message", handler);
         if (interval) clearInterval(interval);
         const { authCode } = event.data;
@@ -508,8 +509,11 @@ export class LicenseClient {
    * @returns {Promise<object>}
    */
   async #apiCall(endpoint, body) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
     const init = {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         "X-Installation-ID": this.#installationId ?? ""
@@ -523,6 +527,8 @@ export class LicenseClient {
       response = await fetch(`${API_BASE}${endpoint}`, init);
     } catch (err) {
       throw new LicenseError(err?.message ?? "Network error", "NETWORK_ERROR");
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (!response.ok) {

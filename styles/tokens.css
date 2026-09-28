@@ -41,7 +41,7 @@
 
     /* Touch ---------------------------------------------------------- */
     --vm-scale: 1;
-    --vm-touch-target: calc(44px * var(--vm-scale));
+    --vm-touch-target: max(44px, calc(44px * var(--vm-scale)));
     /* Minimum font size on inputs that prevents iOS focus auto-zoom.    */
     --vm-font-min: 16px;
 

@@ -48,6 +48,8 @@ export class MobileSettings extends VelvetComponent {
   /** @type {{listen: Function, gesture: Function, dispose: () => void}|null} */
   #bodyScope = null;
 
+  #returnFocus = null;
+
   /** @param {object} [options] @param {() => void} [options.onDismiss] */
   constructor({ onDismiss = null } = {}) {
     super();
@@ -59,11 +61,25 @@ export class MobileSettings extends VelvetComponent {
 
   /** @returns {this} */
   open() {
+    this.#returnFocus = document.activeElement;
     this.mount();
+    this.element.querySelector(".vm-set-close")?.focus({ preventScroll: true });
+    this.listen(this.element, "keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.dismiss();
+    });
     Motion.slide(this.element, "translateY(100%)", "translateY(0)").then(() => {
       if (this.element) this.element.style.transform = "";
     });
     return this;
+  }
+
+  destroy() {
+    super.destroy();
+    if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
+    this.#returnFocus = null;
   }
 
   /** Animate out, ask about any pending reload, then destroy. */
@@ -155,7 +171,7 @@ export class MobileSettings extends VelvetComponent {
       cls: "vm-set-header",
       children: [
         el("div", { cls: "vm-set-bar", children: [back, title, close] }),
-        search
+        el("div", { cls: "vm-set-searchbox", children: [VelvetComponent.icon("fa-solid fa-magnifying-glass"), search] })
       ]
     });
   }
@@ -172,6 +188,7 @@ export class MobileSettings extends VelvetComponent {
   #render({ keepScroll = false } = {}) {
     const body = this.element?.querySelector(".vm-set-body");
     if (!body) return;
+    const scrollTop = body.scrollTop;
     this.#bodyScope?.dispose();
     this.#bodyScope = this.scope();
     body.replaceChildren();
@@ -180,12 +197,15 @@ export class MobileSettings extends VelvetComponent {
     const searching = Boolean(this.#query.trim());
     // Search is a view of everything, so "back" would have nowhere to go.
     if (back) back.hidden = searching || !this.#categoryId;
+    const category = this.#categories.find((entry) => entry.id === this.#categoryId);
+    this.element.querySelector(".vm-set-title").textContent = !searching && category
+      ? category.label : game.i18n.localize(`${L10N}.Shell.Settings`);
 
     if (searching) this.#renderSearch(body);
     else if (this.#categoryId) this.#renderCategory(body);
     else this.#renderCategoryList(body);
 
-    if (!keepScroll) body.scrollTop = 0;
+    body.scrollTop = keepScroll ? scrollTop : 0;
   }
 
   /** @param {HTMLElement} body */
@@ -197,6 +217,10 @@ export class MobileSettings extends VelvetComponent {
         cls: "vm-set-cat",
         attrs: { type: "button" },
         children: [
+          el("span", { cls: "vm-set-cat-icon", children: [VelvetComponent.icon(
+            category.id === "core" ? "fa-solid fa-sliders" : category.id === "system"
+              ? "fa-solid fa-dice-d20" : category.id === "velvet-mobile" ? "fa-solid fa-mobile-screen" : "fa-solid fa-puzzle-piece"
+          )] }),
           el("span", { cls: "vm-set-cat-label", text: category.label }),
           el("span", { cls: "vm-set-cat-count", text: String(category.entries.length) }),
           VelvetComponent.icon("fa-solid fa-chevron-right")
@@ -212,10 +236,8 @@ export class MobileSettings extends VelvetComponent {
 
   /** @param {HTMLElement} body */
   #renderCategory(body) {
-    const el = VelvetComponent.el;
     const category = this.#categories.find((entry) => entry.id === this.#categoryId);
     if (!category) return void body.append(this.#emptyNote());
-    body.append(el("h2", { cls: "vm-set-group", text: category.label }));
     for (const entry of category.entries) body.append(this.#buildEntry(entry));
   }
 
@@ -275,7 +297,7 @@ export class MobileSettings extends VelvetComponent {
       }));
     }
 
-    return el("div", { cls: `vm-set-row vm-set-${entry.control ?? "menu"}`, children });
+    return el("div", { cls: `vm-set-row vm-set-row-${entry.control ?? "menu"}`, children });
   }
 
   /** @param {object} entry @returns {HTMLElement} */
@@ -344,7 +366,7 @@ export class MobileSettings extends VelvetComponent {
       await this.#write(entry, next, () => {
         btn.setAttribute("aria-checked", String(!next));
         btn.classList.toggle("vm-on", !next);
-      });
+      }, btn);
     });
     return btn;
   }
@@ -364,7 +386,7 @@ export class MobileSettings extends VelvetComponent {
       const next = typeof entry.value === "number" && raw !== "" && Number.isFinite(Number(raw))
         ? Number(raw)
         : raw;
-      this.#write(entry, next);
+      this.#write(entry, next, () => { select.value = String(entry.value); }, select);
     });
     return select;
   }
@@ -384,7 +406,10 @@ export class MobileSettings extends VelvetComponent {
     this.#bodyScope.listen(input, "input", () => {
       readout.textContent = input.value;
     });
-    this.#bodyScope.listen(input, "change", () => this.#write(entry, Number(input.value)));
+    this.#bodyScope.listen(input, "change", () => this.#write(entry, Number(input.value), () => {
+      input.value = String(entry.value);
+      readout.textContent = input.value;
+    }, input));
     return el("div", { cls: "vm-set-slider", children: [input, readout] });
   }
 
@@ -393,14 +418,18 @@ export class MobileSettings extends VelvetComponent {
     const el = VelvetComponent.el;
     const input = el("input", {
       cls: "vm-set-input",
-      attrs: { type, "aria-label": entry.label, ...(type === "number" ? { inputmode: "decimal" } : {}) }
+      attrs: { type, "aria-label": entry.label, ...(type === "number" ? { inputmode: "decimal", step: "any" } : {}) }
     });
     input.value = entry.value ?? "";
     // `change` rather than `input`: one write when the field is committed,
     // not one per keystroke against the server.
     this.#bodyScope.listen(input, "change", () => {
       const raw = input.value;
-      this.#write(entry, type === "number" ? Number(raw) : raw);
+      if (type === "number" && (!raw.trim() || !input.checkValidity())) {
+        input.value = entry.value ?? "";
+        return;
+      }
+      this.#write(entry, type === "number" ? Number(raw) : raw, () => { input.value = entry.value ?? ""; }, input);
     });
     return input;
   }
@@ -410,7 +439,7 @@ export class MobileSettings extends VelvetComponent {
     const el = VelvetComponent.el;
     const input = el("input", { cls: "vm-set-input", attrs: { type: "text", "aria-label": entry.label } });
     input.value = entry.value ?? "";
-    this.#bodyScope.listen(input, "change", () => this.#write(entry, input.value));
+    this.#bodyScope.listen(input, "change", () => this.#write(entry, input.value, () => { input.value = entry.value ?? ""; }, input));
 
     const browse = el("button", {
       cls: "vm-set-browse",
@@ -425,7 +454,7 @@ export class MobileSettings extends VelvetComponent {
           current: input.value,
           callback: (path) => {
             input.value = path;
-            this.#write(entry, path);
+            this.#write(entry, path, () => { input.value = entry.value ?? ""; }, input);
           }
         }).browse();
       } catch (err) {
@@ -440,8 +469,14 @@ export class MobileSettings extends VelvetComponent {
    * @param {object} entry
    * @param {*} value
    * @param {() => void} [revert]  Undo the optimistic UI if the write fails.
+   * @param {HTMLElement} [control] Control whose row is locked during the write.
    */
-  async #write(entry, value, revert) {
+  async #write(entry, value, revert, control) {
+    const row = control?.closest(".vm-set-row");
+    const controls = [...(row?.querySelectorAll("button, input, select") ?? [])];
+    const disabled = controls.map((element) => element.disabled);
+    for (const element of controls) element.disabled = true;
+    row?.setAttribute("aria-busy", "true");
     try {
       await game.settings.set(entry.namespace, entry.key, value);
       entry.value = value;
@@ -453,6 +488,9 @@ export class MobileSettings extends VelvetComponent {
       Logger.error(`Could not save setting ${entry.id}`, err);
       ui.notifications?.error(err.message ?? String(err));
       revert?.();
+    } finally {
+      controls.forEach((element, index) => { element.disabled = disabled[index]; });
+      row?.removeAttribute("aria-busy");
     }
   }
 

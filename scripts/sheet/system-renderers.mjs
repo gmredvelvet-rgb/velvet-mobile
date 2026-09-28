@@ -12,6 +12,7 @@ import { THEMES } from "../core/constants.mjs";
 
 const SYSTEMS_BY_THEME = Object.freeze({
   [THEMES.AAA]: "dnd5e",
+  [THEMES.MODERN_RPG]: "talespire",
   [THEMES.VELVET_PF2E]: "pf2e",
   [THEMES.CYBER]: "sf2e",
   [THEMES.HOPEFINDER]: "hopefinder",
@@ -138,6 +139,32 @@ function pf2eRow({ el, row, tab, section, main, actions, detail, role }) {
   });
 }
 
+function talespireRow({ el, row, main, actions, detail, role }) {
+  const traits = metaList(row);
+  const badge = row.badge ? el("span", { cls: "vm-sys-badge", text: row.badge }) : "";
+  return el("article", {
+    cls: `vm-ms-row vm-sys-row vm-sys-row-talespire vm-sys-role-${role} ${row.dim ? "vm-dim" : ""}`.trim(),
+    attrs: {
+      "data-vm-row-role": role,
+      "data-vm-name": String(row.label ?? "").toLowerCase(),
+      "data-vm-meta": String(row.sub ?? "").toLowerCase()
+    },
+    children: [
+      rowLine(el, [
+        el("div", {
+          cls: "vm-sys-talespire-main",
+          children: [
+            main,
+            badge,
+            traits.length ? el("div", { cls: "vm-sys-subline", text: traits.join(" · ") }) : ""
+          ].filter(Boolean)
+        })
+      ], actions),
+      detail
+    ].filter(Boolean)
+  });
+}
+
 function cyberRow({ el, row, tab, section, main, actions, detail, role }) {
   const status = row.dim ? "STANDBY" : row.badge || (actions.some((action) => action.classList.contains("vm-on")) ? "ACTIVE" : "READY");
   return el("article", {
@@ -192,6 +219,7 @@ function hopefinderRow({ el, row, tab, section, main, actions, detail, role }) {
 const RENDERERS = Object.freeze({
   default: Object.freeze({ id: "default", row: defaultRow }),
   dnd5e: Object.freeze({ id: "dnd5e", row: dndRow }),
+  talespire: Object.freeze({ id: "talespire", row: talespireRow }),
   pf2e: Object.freeze({ id: "pf2e", row: pf2eRow }),
   sf2e: Object.freeze({ id: "sf2e", row: cyberRow }),
   hopefinder: Object.freeze({ id: "hopefinder", row: hopefinderRow })

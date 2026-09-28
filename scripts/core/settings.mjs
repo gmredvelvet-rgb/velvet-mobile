@@ -4,12 +4,21 @@
  * @module core/settings
  */
 
-import { MODULE_ID, L10N, SETTINGS, MODES, CHAT_MODES, MOVE_STYLES, STEP_SOUNDS, THEMES } from "./constants.mjs";
+import {
+  MODULE_ID, L10N, SETTINGS, MODES, USER_MODE_OVERRIDES,
+  CHAT_MODES, MOVE_STYLES, STEP_SOUNDS, THEMES
+} from "./constants.mjs";
 import { Logger } from "./logger.mjs";
 import { licenseMenuClass } from "../license/license-ui.mjs";
 import { hubActive, isModuleLicensed } from "../license/license-hub.mjs";
 
 export class Settings {
+  /** @type {Set<string>} Per-player world settings already registered. */
+  static #registeredUserModes = new Set();
+
+  /** @type {((userId: string, value: string) => void)|null} */
+  static #onUserModeChange = null;
+
   /**
    * Register every setting.
    * @param {object} callbacks                     Change handlers owned by the controller.
@@ -17,8 +26,9 @@ export class Settings {
    * @param {(value: number) => void} callbacks.onScaleChange
    * @param {(value: boolean) => void} callbacks.onDebugChange
    */
-  static register({ onModeChange, onMapChange, onScaleChange, onThemeChange, onDebugChange }) {
+  static register({ onModeChange, onUserModeChange, onMapChange, onScaleChange, onThemeChange, onDebugChange }) {
     const localize = (key) => `${L10N}.Settings.${key}`;
+    this.#onUserModeChange = onUserModeChange;
 
     // World licence flag: written by the GM's client after Patreon auth,
     // read by every client to decide whether the module may run at all.
@@ -56,6 +66,8 @@ export class Settings {
       onChange: onModeChange
     });
 
+    this.#registerOwnUserMode();
+
     /* Auto follows the table's own sheet module, then the game system — see
        core/theme.mjs. The explicit choices are for a table that runs one of
        these sheets but prefers the look of another. */
@@ -69,6 +81,7 @@ export class Settings {
         [THEMES.AUTO]: localize("Theme.Auto"),
         [THEMES.VELVET]: localize("Theme.Velvet"),
         [THEMES.AAA]: localize("Theme.Aaa"),
+        [THEMES.MODERN_RPG]: localize("Theme.ModernRpg"),
         [THEMES.VELVET_PF2E]: localize("Theme.VelvetPf2e"),
         [THEMES.CYBER]: localize("Theme.Cyber"),
         [THEMES.HOPEFINDER]: localize("Theme.Hopefinder")
@@ -189,9 +202,81 @@ export class Settings {
     });
   }
 
+  /**
+   * Register one GM-visible world selector per player, labelled with their
+   * name. Runs at ready and on createUser: during init neither game.users nor
+   * the translations exist yet.
+   */
+  static registerPlayerModes() {
+    // v14 dropped i18n.format; localize interpolates instead.
+    const format = (key, data) => typeof game.i18n.format === "function"
+      ? game.i18n.format(key, data)
+      : game.i18n.localize(key, data);
+    for (const user of game.users?.contents ?? []) {
+      if (!user?.id || user.isGM) continue;
+      this.#registerUserMode(user.id, {
+        name: format(`${L10N}.Settings.PlayerMode.Name`, { name: user.name }),
+        hint: format(`${L10N}.Settings.PlayerMode.Hint`, { name: user.name })
+      });
+    }
+  }
+
+  /**
+   * The connected player's own override must be readable at init, when
+   * core.noCanvas is synced, so register it from the raw world data. The
+   * label does not matter: players never see world settings.
+   */
+  static #registerOwnUserMode() {
+    const own = game.data?.users?.find((user) => user._id === game.userId);
+    if (!own || own.role >= CONST.USER_ROLES.ASSISTANT) return;
+    this.#registerUserMode(own._id, { name: `${L10N}.Settings.PlayerMode.Name` });
+  }
+
+  /**
+   * @param {string} userId
+   * @param {{name: string, hint?: string}} labels
+   */
+  static #registerUserMode(userId, { name, hint }) {
+    const key = this.userModeKey(userId);
+    if (this.#registeredUserModes.has(key)) return;
+    game.settings.register(MODULE_ID, key, {
+      name,
+      hint,
+      scope: "world",
+      config: true,
+      restricted: true,
+      type: String,
+      choices: {
+        [USER_MODE_OVERRIDES.OWN]: `${L10N}.Settings.PlayerMode.Own`,
+        [MODES.PHONE]: `${L10N}.Settings.PlayerMode.Phone`,
+        [MODES.TABLET]: `${L10N}.Settings.PlayerMode.Tablet`,
+        [MODES.OFF]: `${L10N}.Settings.PlayerMode.Off`
+      },
+      default: USER_MODE_OVERRIDES.OWN,
+      onChange: (value) => this.#onUserModeChange?.(userId, value)
+    });
+    this.#registeredUserModes.add(key);
+  }
+
+  /** @param {string} userId @returns {string} */
+  static userModeKey(userId) {
+    return `${SETTINGS.USER_MODE_PREFIX}${userId}`;
+  }
+
   /** @returns {string} */
   static get mode() {
-    return game.settings.get(MODULE_ID, SETTINGS.MODE);
+    const own = game.settings.get(MODULE_ID, SETTINGS.MODE);
+    // game.user is still null during init; game.userId is not.
+    const userId = game.user?.id ?? game.userId;
+    if (!userId) return own;
+    const key = this.userModeKey(userId);
+    if (!this.#registeredUserModes.has(key)) return own;
+    try {
+      const override = game.settings.get(MODULE_ID, key);
+      return override === USER_MODE_OVERRIDES.OWN ? own : override;
+    } catch {
+      return own;
+    }
   }
 
   /**

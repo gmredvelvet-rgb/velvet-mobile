@@ -15,12 +15,21 @@
         "Tablet": "Force Tablet",
         "Off": "Off (desktop experience)"
       },
+      "PlayerMode": {
+        "Name": "Mobile Mode — {name}",
+        "Hint": "GM override for {name}. Use their own setting leaves this player in control; the other choices apply only to this account.",
+        "Own": "Use player's own setting",
+        "Phone": "Force Mobile (phone)",
+        "Tablet": "Force Mobile (tablet)",
+        "Off": "Force Off (desktop)"
+      },
       "Theme": {
         "Name": "Theme",
         "Hint": "The look of the mobile interface. Auto follows whichever of the Velvet sheet modules this world has active, then falls back to the game system — so the phone matches the sheet your players already use on a desktop. Pick one outright to override that.",
         "Auto": "Auto (match the sheet module)",
         "Velvet": "Velvet Mobile (default)",
         "Aaa": "AAA D&D — gold and Cinzel",
+        "ModernRpg": "Modern RPG — stone and inventory",
         "VelvetPf2e": "Velvet PF2e — gilded void",
         "Cyber": "Cyberpunk — cyan on navy",
         "Hopefinder": "Hopefinder — survivor field manual"
@@ -218,7 +227,26 @@
       "AmmoHint": "Which ammunition do you want to load?",
       "AmmoNone": "No compatible ammunition in this character's inventory.",
       "NotRollable": "This system offers no roll for that.",
-      "Empty": "Nothing to show"
+      "Empty": "Nothing to show",
+      "Use": "Use",
+      "Loading": "Loading…",
+      "TabCrafting": "Crafting",
+      "Formulas": "Formulas",
+      "NoFormulas": "No formulas known yet. Formulas are learned on the desktop sheet: drag an item onto its Crafting tab, or use the Compendium Browser.",
+      "Craft": "Craft",
+      "CraftDC": "DC {dc}",
+      "CraftMaxLevel": "Up to level {level}",
+      "CraftSlotsFree": "{count} free",
+      "CraftResourceCost": "Total cost {cost}",
+      "PrepareFormula": "Prepare formula",
+      "NoValidFormulas": "No known formula fits this ability.",
+      "Expended": "Expended",
+      "ToggleExpended": "Toggle expended",
+      "SignatureItem": "Signature item",
+      "DailyCrafting": "Daily crafting",
+      "DailyCraftingPerform": "Perform daily crafting",
+      "DailyCraftingDone": "Done for today",
+      "DailyCraftingReset": "Reset daily crafting"
     }
   }
 }
